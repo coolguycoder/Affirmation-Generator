@@ -20,19 +20,13 @@ jobs:
         run: |
           mkdir output
           dotnet build "Installer/Installer Win.csproj" -c Release -o output/installer
-          # Build the app project and output next to installer outputs (only if project exists)
-          if (Test-Path -Path "app\app.csproj") {
-            dotnet build "app/app.csproj" -c Release -o output/app
-          } else {
-            Write-Host "app/app.csproj not found — skipping app build"
-          }
+          # Build the app project and output next to installer outputs
+          dotnet build "app/app.csproj" -c Release -o output/app
           # If the build produces .bin files, compress them. Otherwise, fall back to any .exe.
           pushd output
           # Include both installer and app outputs in the zip
-          $files = Get-ChildItem -Path installer,app -Filter "*.bin" -File -ErrorAction SilentlyContinue
-          if ($files.Count -gt 0) {
-            # compress found .bin files from both folders
-            Compress-Archive -Path ( $files | ForEach-Object { $_.FullName } ) -DestinationPath ..\AffirmationImageGenerator-x64.zip -Force
+          if (Test-Path -Path "installer\*.bin" -or Test-Path -Path "app\*.bin") {
+            Compress-Archive -Path installer\*.bin,app\*.bin -DestinationPath ..\AffirmationImageGenerator-x64.zip -Force
           } else {
             # include all produced artifacts (exes, dlls, etc.)
             Compress-Archive -Path * -DestinationPath ..\AffirmationImageGenerator-x64.zip -Force
@@ -57,17 +51,12 @@ jobs:
         run: |
           mkdir output
           dotnet build "Installer/Installer Win.csproj" -c Release -o output/installer
-          # Build the app project (only if project exists)
-          if (Test-Path -Path "app\app.csproj") {
-            dotnet build "app/app.csproj" -c Release -o output/app
-          } else {
-            Write-Host "app/app.csproj not found — skipping app build"
-          }
+          # Build the app project
+          dotnet build "app/app.csproj" -c Release -o output/app
           # Compress .bin files into a zip; if none exist, include produced artifacts
           pushd output
-          $files = Get-ChildItem -Path installer,app -Filter "*.bin" -File -ErrorAction SilentlyContinue
-          if ($files.Count -gt 0) {
-            Compress-Archive -Path ( $files | ForEach-Object { $_.FullName } ) -DestinationPath ..\AffirmationImageGenerator-aarch64.zip -Force
+          if (Test-Path -Path "installer\*.bin" -or Test-Path -Path "app\*.bin") {
+            Compress-Archive -Path installer\*.bin,app\*.bin -DestinationPath ..\AffirmationImageGenerator-aarch64.zip -Force
           } else {
             Compress-Archive -Path * -DestinationPath ..\AffirmationImageGenerator-aarch64.zip -Force
           }
