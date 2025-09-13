@@ -20,8 +20,12 @@ jobs:
         run: |
           mkdir output
           dotnet build "Installer/Installer Win.csproj" -c Release -o output/installer
-          # Build the app project and output next to installer outputs
-          dotnet build "app/app.csproj" -c Release -o output/app
+          # Build the app project and output next to installer outputs (only if project exists)
+          if (Test-Path -Path "app\app.csproj") {
+            dotnet build "app/app.csproj" -c Release -o output/app
+          } else {
+            Write-Host "app/app.csproj not found — skipping app build"
+          }
           # If the build produces .bin files, compress them. Otherwise, fall back to any .exe.
           pushd output
           # Include both installer and app outputs in the zip
@@ -53,8 +57,12 @@ jobs:
         run: |
           mkdir output
           dotnet build "Installer/Installer Win.csproj" -c Release -o output/installer
-          # Build the app project
-          dotnet build "app/app.csproj" -c Release -o output/app
+          # Build the app project (only if project exists)
+          if (Test-Path -Path "app\app.csproj") {
+            dotnet build "app/app.csproj" -c Release -o output/app
+          } else {
+            Write-Host "app/app.csproj not found — skipping app build"
+          }
           # Compress .bin files into a zip; if none exist, include produced artifacts
           pushd output
           $files = Get-ChildItem -Path installer,app -Filter "*.bin" -File -ErrorAction SilentlyContinue
