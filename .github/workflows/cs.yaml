@@ -20,13 +20,21 @@ jobs:
         run: |
           mkdir output
           dotnet build "Installer/Installer Win.csproj" -c Release -o output
-          mv output/*.exe output/AffirmationImageGenerator-x64.exe
+          # If the build produces .bin files, compress them. Otherwise, fall back to any .exe.
+          pushd output
+          if (Test-Path -Path "*.bin") {
+            Compress-Archive -Path *.bin -DestinationPath ..\AffirmationImageGenerator-x64.zip -Force
+          } else {
+            # include exe as well if present
+            Compress-Archive -Path * -DestinationPath ..\AffirmationImageGenerator-x64.zip -Force
+          }
+          popd
 
-      - name: Upload x64 artifact
+      - name: Upload x64 artifact (zip)
         uses: actions/upload-artifact@v4.6.2
         with:
-          name: x64-binary
-          path: output/AffirmationImageGenerator-x64.exe
+          name: x64-zip
+          path: AffirmationImageGenerator-x64.zip
 
   build-windows-arm64:
     runs-on: windows-11-arm
@@ -40,13 +48,20 @@ jobs:
         run: |
           mkdir output
           dotnet build "Installer/Installer Win.csproj" -c Release -o output
-          mv output/*.exe output/AffirmationImageGenerator-aarch64.exe
+          # Compress .bin files into a zip; if none exist, include produced artifacts
+          pushd output
+          if (Test-Path -Path "*.bin") {
+            Compress-Archive -Path *.bin -DestinationPath ..\AffirmationImageGenerator-aarch64.zip -Force
+          } else {
+            Compress-Archive -Path * -DestinationPath ..\AffirmationImageGenerator-aarch64.zip -Force
+          }
+          popd
 
-      - name: Upload ARM64 artifact
+      - name: Upload ARM64 artifact (zip)
         uses: actions/upload-artifact@v4.6.2
         with:
-          name: arm64-binary
-          path: output/AffirmationImageGenerator-aarch64.exe
+          name: arm64-zip
+          path: AffirmationImageGenerator-aarch64.zip
 
   release:
     needs: [build-windows-x64, build-windows-arm64]
@@ -58,13 +73,13 @@ jobs:
       - name: Download x64 artifact
         uses: actions/download-artifact@v4
         with:
-          name: x64-binary
+          name: x64-zip
           path: release_artifacts/x64
 
       - name: Download ARM64 artifact
         uses: actions/download-artifact@v4
         with:
-          name: arm64-binary
+          name: arm64-zip
           path: release_artifacts/arm64
 
       - name: Verify downloaded files
@@ -83,6 +98,6 @@ jobs:
             - Windows x64
             - Windows ARM64
           artifacts: |
-            release_artifacts/x64/AffirmationImageGenerator-x64.exe
-            release_artifacts/arm64/AffirmationImageGenerator-aarch64.exe
+            release_artifacts/x64/AffirmationImageGenerator-x64.zip
+            release_artifacts/arm64/AffirmationImageGenerator-aarch64.zip
           token: ${{ secrets.GITHUB_TOKEN }}
