@@ -1,910 +1,869 @@
+// Program.cs
 using System;
 using System.Collections.Generic;
-using System.Drawing;
-using System.Drawing.Imaging;
-using System.Drawing.Text;
+using System.Diagnostics;
 using System.IO;
+using System.IO.Compression;
 using System.Linq;
-using System.Text.Json;
+using System.Net.Http;
+using System.Text.RegularExpressions;
+using System.Threading;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 
-namespace AffirmationImageGeneratorNice
+namespace SimpleInstaller
 {
-    public class Settings
-    {
-        public string? OutputFolder { get; set; }
-        public string? FontPath { get; set; }
-        public decimal FontSize { get; set; }
-        public int TextColor { get; set; }
-        public bool RandomBase { get; set; }
-    }
-
     static class Program
     {
         [STAThread]
         static void Main()
         {
             ApplicationConfiguration.Initialize();
-            Application.Run(new WizardForm());
+            Application.Run(new InstallerForm());
         }
     }
 
-    public class WizardForm : Form
+    public class InstallerForm : Form
     {
-        // header / stepper
-        private Panel headerPanel = new Panel();
-        private Label titleLabel = new Label();
-        private FlowLayoutPanel stepPanel = new FlowLayoutPanel();
+        // UI
+        Label lblTitle;
+        Label lblProduct;
+        TextBox txtPath;
+        Button btnBrowse;
+        Button btnInstall;
+        ProgressBar progressBar;
+        Label lblStatus;   // single-line status (short)
+        Label lblAction;   // what it's working on currently
+        Label lblETA;      // ETA or speed
+        CheckBox chkRunAfter;
+        CheckBox chkCreateShortcut;
+        GroupBox groupBox;
 
-        // wizard panels
-        private Panel[] steps = new Panel[3];
-        private int stepIndex = 0;
+        // Download URL (raw GitHub file you provided)
+        const string DownloadUrl = "https://github.com/coolguycoder/ShmolphMakesSites.github.io/raw/3e09e3bc16c46ae306f681b016e55a8cbb87973d/Main.zip";
 
-        // step 1 controls (setup)
-        private TextBox basePathBox = new TextBox();
-        private Button btnChooseBase = new Button();
-        private ListBox baseImagesList = new ListBox();
-        private Label baseCountLabel = new Label();
-        private TextBox outputFolderBox = new TextBox();
-        private Button btnChooseOutput = new Button();
-        private TextBox fontPathBox = new TextBox();
-        private Button btnChooseFont = new Button();
-        private NumericUpDown fontSizeUp = new NumericUpDown();
-        private Button btnChooseColor = new Button();
-        private Panel colorPreview = new Panel();
-        private CheckBox chkRandomBase = new CheckBox();
+        // Quick scan config
+        const int SystemScanTimeoutMs = 8000; // time budget to find existing installation (ms)
+        readonly string[] FilenameTokensToFind = new[] { "shmolph", "shmolphmakessites", "mydownloadedapp", "main" };
 
-        // step 2 controls (affirmations)
-        private ListBox lstAffirmations = new ListBox();
-        private TextBox txtNewAffirmation = new TextBox();
-        private Button btnAddAff = new Button();
-        private Button btnRemoveAff = new Button();
-        private Button btnLoadList = new Button();
-        private Button btnSaveList = new Button();
-
-        // step 3 controls (preview & generate)
-        private PictureBox previewBox = new PictureBox();
-        private Button btnPreview = new Button();
-        private Button btnGenerate = new Button();
-
-        // navigation
-        private Button btnBack = new Button();
-        private Button btnNext = new Button();
-
-        // setup mode controls
-        private Button btnHiddenSetup = new Button();   // tiny hidden button to enter setup
-        private Button btnSaveSetup = new Button();     // visible only while in setup mode
-
-        // fonts and styling
-        private PrivateFontCollection pfc = new PrivateFontCollection();
-        private Font? loadedFont = null;
-        private Color chosenColor = Color.White;
-
-        // settings
-        private readonly string settingsPath = Path.Combine(AppContext.BaseDirectory, "affirmation_settings.json");
-        private bool setupMode = false;
-
-        public WizardForm()
+        public InstallerForm()
         {
-            Text = "Affirmation Image Maker";
-            Width = 1100;
-            Height = 760;
-            KeyPreview = true;
-            StartPosition = FormStartPosition.CenterScreen;
-            BackColor = Color.FromArgb(245, 247, 250);
-            Font = new Font("Segoe UI", 10);
-            FormBorderStyle = FormBorderStyle.FixedSingle;
+            InitializeVisuals();
+        }
+
+        private void InitializeVisuals()
+        {
+            Text = "Installer";
+            Width = 640;
+            Height = 320;
+            FormBorderStyle = FormBorderStyle.FixedDialog;
             MaximizeBox = false;
+            StartPosition = FormStartPosition.CenterScreen;
+            Font = new System.Drawing.Font("Segoe UI", 9F);
 
-            BuildHeader();
-            BuildSteps();
-            BuildNavigation();
-            WireKeys();
-
-            // load saved settings if present (auto-apply to controls, but do NOT change starting page)
-            LoadSettingsIfExists();
-
-            // populate base images list immediately (so preview works right away if a base/folder is already set)
-            PopulateBaseList();
-
-            // ensure we start on setup page so user sees Step 1 on load
-            stepIndex = 0;
-            UpdateStep();
-
-            this.FormClosing += WizardForm_FormClosing;
-        }
-
-        private void BuildHeader()
-        {
-            headerPanel.SetBounds(0, 0, ClientSize.Width, 120);
-            headerPanel.BackColor = Color.White;
-            headerPanel.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
-            Controls.Add(headerPanel);
-
-            titleLabel.Text = "Affirmation Image Maker";
-            titleLabel.Font = new Font("Segoe UI Semibold", 20f);
-            titleLabel.ForeColor = Color.FromArgb(35, 47, 63);
-            titleLabel.SetBounds(20, 12, 600, 36);
-            headerPanel.Controls.Add(titleLabel);
-
-            var subtitle = new Label
+            lblTitle = new Label
             {
-                Text = "Make nice image cards from simple lines of text",
-                Font = new Font("Segoe UI", 9f),
-                ForeColor = Color.FromArgb(100, 110, 120),
-            };
-            subtitle.SetBounds(22, 52, 600, 26);
-            headerPanel.Controls.Add(subtitle);
-
-            stepPanel.FlowDirection = FlowDirection.LeftToRight;
-            stepPanel.SetBounds(650, 18, 420, 80);
-            stepPanel.Padding = new Padding(8);
-            stepPanel.AutoSize = false;
-            headerPanel.Controls.Add(stepPanel);
-
-            for (int i = 0; i < 3; i++)
-            {
-                var card = CreateStepCard(i + 1, i == 0 ? "Setup" : i == 1 ? "Affirmations" : "Preview");
-                stepPanel.Controls.Add(card);
-            }
-
-            // tiny hidden setup button (top-right of header). small, flat, visually unobtrusive.
-            btnHiddenSetup.SetBounds(headerPanel.Width - 28, 12, 16, 16);
-            btnHiddenSetup.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-            btnHiddenSetup.FlatStyle = FlatStyle.Flat;
-            btnHiddenSetup.FlatAppearance.BorderSize = 0;
-            btnHiddenSetup.BackColor = Color.Transparent;
-            btnHiddenSetup.TabStop = false;
-            btnHiddenSetup.Click += (s, e) => EnterSetupMode();
-            headerPanel.Controls.Add(btnHiddenSetup);
-
-            // save-setup button (only visible while in setup mode)
-            btnSaveSetup.Text = "Save setup";
-            btnSaveSetup.SetBounds(headerPanel.Width - 140, 64, 120, 32);
-            btnSaveSetup.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-            btnSaveSetup.Click += (s, e) => SaveSetupAndExit();
-            btnSaveSetup.Visible = false;
-            headerPanel.Controls.Add(btnSaveSetup);
-        }
-
-        private Control CreateStepCard(int num, string text)
-        {
-            var panel = new Panel { Width = 128, Height = 64, BackColor = Color.FromArgb(250, 250, 250) };
-            panel.Margin = new Padding(6);
-            panel.Padding = new Padding(6);
-            panel.BorderStyle = BorderStyle.None;
-            panel.Tag = num - 1;
-
-            panel.Paint += (s, e) =>
-            {
-                using var p = new Pen(Color.FromArgb(230, 230, 230));
-                e.Graphics.DrawRectangle(p, 0, 0, panel.Width - 1, panel.Height - 1);
-            };
-
-            var lblNum = new Label
-            {
-                Text = num.ToString(),
-                Font = new Font("Segoe UI Semibold", 12f),
-                ForeColor = Color.FromArgb(60, 70, 90),
-                TextAlign = ContentAlignment.MiddleCenter,
-                Width = 28,
+                Text = "MyDownloadedApp Installer",
+                Left = 12,
+                Top = 10,
+                Width = ClientSize.Width - 24,
                 Height = 28,
+                Font = new System.Drawing.Font("Segoe UI", 12F, System.Drawing.FontStyle.Bold),
+                TextAlign = System.Drawing.ContentAlignment.MiddleLeft
             };
-            lblNum.SetBounds(8, 8, 28, 28);
-            panel.Controls.Add(lblNum);
+            Controls.Add(lblTitle);
 
-            var lblText = new Label
+            lblProduct = new Label
             {
-                Text = text,
-                Font = new Font("Segoe UI", 9f),
-                ForeColor = Color.FromArgb(90, 100, 110),
+                Text = "Installs the application and creates a desktop shortcut.",
+                Left = 14,
+                Top = 40,
+                Width = ClientSize.Width - 28,
+                Height = 20
             };
-            lblText.SetBounds(44, 10, 76, 36);
-            panel.Controls.Add(lblText);
+            Controls.Add(lblProduct);
 
-            return panel;
-        }
-
-        private void BuildSteps()
-        {
-            steps = new Panel[3];
-            int top = headerPanel.Bottom + 12;
-            int left = 20;
-            int stepW = ClientSize.Width - 40;
-            int stepH = ClientSize.Height - top - 90;
-
-            var p1 = new Panel { Left = left, Top = top, Width = stepW, Height = stepH, BackColor = Color.Transparent };
-            BuildStep1(p1);
-            Controls.Add(p1);
-            steps[0] = p1;
-
-            var p2 = new Panel { Left = left, Top = top, Width = stepW, Height = stepH, BackColor = Color.Transparent };
-            BuildStep2(p2);
-            Controls.Add(p2);
-            steps[1] = p2;
-
-            var p3 = new Panel { Left = left, Top = top, Width = stepW, Height = stepH, BackColor = Color.Transparent };
-            BuildStep3(p3);
-            Controls.Add(p3);
-            steps[2] = p3;
-        }
-
-        private void BuildStep1(Panel pane)
-        {
-            var card = MakeCard(20, 20, 640, 480);
-            pane.Controls.Add(card);
-
-            int left = 18;
-            int top = 18;
-            int labelW = 140;
-            int ctrlW = 420;
-
-            var lBase = new Label { Text = "Base image or folder:", Left = left, Top = top, Width = labelW };
-            basePathBox.SetBounds(left + labelW, top - 2, ctrlW - 110, 28);
-            btnChooseBase.Text = "Browse";
-            btnChooseBase.SetBounds(basePathBox.Right + 8, top - 2, 90, 28);
-            btnChooseBase.Click += BtnChooseBase_Click;
-            chkRandomBase.Text = "Random if folder";
-            chkRandomBase.SetBounds(btnChooseBase.Left, btnChooseBase.Bottom + 8, 140, 22);
-            chkRandomBase.Checked = true;
-
-            top += 54;
-            var lOut = new Label { Text = "Output folder:", Left = left, Top = top, Width = labelW };
-            outputFolderBox.SetBounds(left + labelW, top - 2, ctrlW - 110, 28);
-            btnChooseOutput.Text = "Browse";
-            btnChooseOutput.SetBounds(outputFolderBox.Right + 8, top - 2, 90, 28);
-            btnChooseOutput.Click += BtnChooseOutput_Click;
-
-            top += 54;
-            var lFont = new Label { Text = "Font (.ttf) (optional):", Left = left, Top = top, Width = labelW };
-            fontPathBox.SetBounds(left + labelW, top - 2, ctrlW - 220, 28);
-            btnChooseFont.Text = "Choose";
-            btnChooseFont.SetBounds(fontPathBox.Right + 8, top - 2, 90, 28);
-            btnChooseFont.Click += BtnChooseFont_Click;
-            var lSize = new Label { Text = "Size:", Left = btnChooseFont.Right + 8, Top = top, Width = 40 };
-            fontSizeUp.SetBounds(lSize.Right + 4, top - 2, 80, 28);
-            fontSizeUp.Minimum = 16;
-            fontSizeUp.Maximum = 240;
-            fontSizeUp.Value = 56;
-
-            top += 54;
-            var lColor = new Label { Text = "Text color:", Left = left, Top = top, Width = labelW };
-            btnChooseColor.Text = "Pick";
-            btnChooseColor.SetBounds(left + labelW, top - 2, 84, 28);
-            btnChooseColor.Click += BtnChooseColor_Click;
-            colorPreview.SetBounds(btnChooseColor.Right + 10, top - 2, 60, 28);
-            colorPreview.BackColor = chosenColor;
-            colorPreview.BorderStyle = BorderStyle.FixedSingle;
-
-            // base images list + count
-            baseImagesList.SetBounds(12, card.Height - 240, card.Width - 24, 200);
-            baseImagesList.Font = new Font("Segoe UI", 9);
-            baseImagesList.SelectedIndexChanged += BaseImagesList_SelectedIndexChanged;
-
-            baseCountLabel.SetBounds(12, baseImagesList.Top - 24, 200, 24);
-            baseCountLabel.Text = "No images selected";
-
-            card.Controls.AddRange(new Control[] {
-                lBase, basePathBox, btnChooseBase, chkRandomBase,
-                lOut, outputFolderBox, btnChooseOutput,
-                lFont, fontPathBox, btnChooseFont, lSize, fontSizeUp,
-                lColor, btnChooseColor, colorPreview,
-                baseImagesList, baseCountLabel
-            });
-
-            // auto-populate when basePathBox changes by leaving focus
-            basePathBox.Leave += (s, e) => PopulateBaseList();
-        }
-
-        private void BuildStep2(Panel pane)
-        {
-            var cardLeft = MakeCard(20, 20, 520, 520);
-            var cardRight = MakeCard(cardLeft.Right + 18, 20, 480, 520);
-            pane.Controls.Add(cardLeft);
-            pane.Controls.Add(cardRight);
-
-            lstAffirmations.SetBounds(12, 12, cardLeft.Width - 24, 380);
-            lstAffirmations.Font = new Font("Segoe UI", 11);
-            lstAffirmations.ItemHeight = 22;
-
-            txtNewAffirmation.SetBounds(12, lstAffirmations.Bottom + 12, 360, 32);
-            txtNewAffirmation.Font = new Font("Segoe UI", 11);
-
-            btnAddAff.Text = "Add";
-            btnAddAff.SetBounds(txtNewAffirmation.Right + 8, txtNewAffirmation.Top, cardLeft.Width - txtNewAffirmation.Right - 20, 34);
-            btnAddAff.Click += BtnAddAff_Click;
-
-            btnRemoveAff.Text = "Remove Selected";
-            btnRemoveAff.SetBounds(btnAddAff.Left, btnAddAff.Bottom + 8, btnAddAff.Width, 34);
-            btnRemoveAff.Click += BtnRemoveAff_Click;
-
-            btnLoadList.Text = "Load .txt";
-            btnLoadList.SetBounds(12, btnAddAff.Bottom + 8, 120, 34);
-            btnLoadList.Click += BtnLoadList_Click;
-
-            btnSaveList.Text = "Save .txt";
-            btnSaveList.SetBounds(btnLoadList.Right + 8, btnLoadList.Top, 120, 34);
-            btnSaveList.Click += BtnSaveList_Click;
-
-            cardLeft.Controls.AddRange(new Control[] {
-                lstAffirmations, txtNewAffirmation, btnAddAff, btnRemoveAff, btnLoadList, btnSaveList
-            });
-
-            lstAffirmations.DoubleClick += (s, e) =>
+            groupBox = new GroupBox
             {
-                if (lstAffirmations.SelectedIndex >= 0)
-                {
-                    var cur = lstAffirmations.Items[lstAffirmations.SelectedIndex].ToString();
-                    var res = Prompt.ShowDialog("Edit affirmation", "Edit", cur ?? "");
-                    if (res != null) lstAffirmations.Items[lstAffirmations.SelectedIndex] = res;
-                }
+                Text = "Installation options",
+                Left = 12,
+                Top = 66,
+                Width = ClientSize.Width - 24,
+                Height = 120
             };
+            Controls.Add(groupBox);
+
+            var lbl = new Label { Text = "Install folder:", Left = 10, Top = 24, Width = 100 };
+            groupBox.Controls.Add(lbl);
+
+            txtPath = new TextBox { Left = 110, Top = 20, Width = 420 };
+            groupBox.Controls.Add(txtPath);
+
+            btnBrowse = new Button { Text = "Browse...", Left = 540, Top = 18, Width = 80 };
+            btnBrowse.Click += BtnBrowse_Click;
+            groupBox.Controls.Add(btnBrowse);
+
+            chkRunAfter = new CheckBox { Text = "Run program after install", Left = 110, Top = 54, Checked = true, Width = 220 };
+            groupBox.Controls.Add(chkRunAfter);
+
+            chkCreateShortcut = new CheckBox { Text = "Create desktop shortcut", Left = 340, Top = 54, Checked = true, Width = 220 };
+            groupBox.Controls.Add(chkCreateShortcut);
+
+            progressBar = new ProgressBar { Left = 20, Top = 200, Width = ClientSize.Width - 40, Height = 22 };
+            Controls.Add(progressBar);
+
+            lblAction = new Label { Left = 20, Top = 230, Width = ClientSize.Width - 40, Height = 18, Text = "Action: Idle" };
+            Controls.Add(lblAction);
+
+            lblETA = new Label { Left = 20, Top = 250, Width = ClientSize.Width - 40, Height = 18, Text = "ETA: --" };
+            Controls.Add(lblETA);
+
+            lblStatus = new Label { Left = 20, Top = 270, Width = ClientSize.Width - 40, Height = 18, Text = "Status: Ready" };
+            Controls.Add(lblStatus);
+
+            btnInstall = new Button { Text = "Install", Left = ClientSize.Width - 160, Top = 100, Width = 120, Height = 36 };
+            btnInstall.Click += async (s, e) => await BtnInstall_Click();
+            groupBox.Controls.Add(btnInstall);
+
+            // default install path (LocalAppData avoids elevation issues)
+            txtPath.Text = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "MyDownloadedApp");
         }
 
-        private void BuildStep3(Panel pane)
+        private void BtnBrowse_Click(object sender, EventArgs e)
         {
-            var card = MakeCard(20, 20, 940, 520);
-            pane.Controls.Add(card);
-
-            previewBox.SetBounds(card.Left + 14, card.Top + 14, 560, 420);
-            previewBox.SizeMode = PictureBoxSizeMode.Zoom;
-            previewBox.BorderStyle = BorderStyle.FixedSingle;
-
-            btnPreview.Text = "Preview Selected";
-            btnPreview.SetBounds(previewBox.Right + 18, previewBox.Top + 20, 240, 44);
-            btnPreview.Click += BtnPreview_Click;
-
-            btnGenerate.Text = "Generate";
-            btnGenerate.SetBounds(previewBox.Right + 18, previewBox.Top + 86, 240, 72);
-            btnGenerate.Font = new Font("Segoe UI Semibold", 12f);
-            btnGenerate.BackColor = Color.FromArgb(46, 139, 87);
-            btnGenerate.ForeColor = Color.White;
-            btnGenerate.FlatStyle = FlatStyle.Flat;
-            btnGenerate.Click += BtnGenerate_Click;
-
-            card.Controls.AddRange(new Control[] { previewBox, btnPreview, btnGenerate });
+            using var dlg = new FolderBrowserDialog();
+            dlg.SelectedPath = txtPath.Text;
+            if (dlg.ShowDialog() == DialogResult.OK)
+                txtPath.Text = dlg.SelectedPath;
         }
 
-        private Panel MakeCard(int x, int y, int w, int h)
+        private async Task BtnInstall_Click()
         {
-            var p = new Panel
-            {
-                Left = x,
-                Top = y,
-                Width = w,
-                Height = h,
-                BackColor = Color.White,
-                BorderStyle = BorderStyle.None
-            };
-            p.Paint += (s, e) =>
-            {
-                using var br = new SolidBrush(Color.FromArgb(245, 247, 250));
-                e.Graphics.FillRectangle(br, new Rectangle(0, 0, p.Width, p.Height));
-                using var pen = new Pen(Color.FromArgb(230, 230, 230));
-                e.Graphics.DrawRectangle(pen, 0, 0, p.Width - 1, p.Height - 1);
-            };
-            return p;
-        }
-
-        private void BuildNavigation()
-        {
-            btnBack.Text = "Back";
-            btnBack.SetBounds(ClientSize.Width - 340, ClientSize.Height - 62, 120, 40);
-            btnBack.Click += (s, e) => { if (stepIndex > 0) stepIndex--; UpdateStep(); };
-
-            btnNext.Text = "Next";
-            btnNext.SetBounds(ClientSize.Width - 200, ClientSize.Height - 62, 120, 40);
-            btnNext.Click += (s, e) => { if (stepIndex < steps.Length - 1) stepIndex++; UpdateStep(); };
-
-            Controls.AddRange(new Control[] { btnBack, btnNext });
-        }
-
-        private void UpdateStep()
-        {
-            for (int i = 0; i < steps.Length; i++) steps[i].Visible = (i == stepIndex);
-
-            foreach (Control c in stepPanel.Controls)
-            {
-                if (c is Panel p && p.Tag is int idx)
-                {
-                    bool active = idx == stepIndex;
-                    p.BackColor = active ? Color.FromArgb(46, 139, 87) : Color.FromArgb(250, 250, 250);
-                    foreach (Control ch in p.Controls)
-                    {
-                        if (ch is Label lb) lb.ForeColor = active ? Color.White : Color.FromArgb(90, 100, 110);
-                    }
-                }
-            }
-
-            btnBack.Enabled = stepIndex > 0;
-            btnNext.Enabled = stepIndex < steps.Length - 1;
-            btnGenerate.Visible = (stepIndex == steps.Length - 1);
-            btnNext.Visible = (stepIndex < steps.Length - 1);
-
-            var headerHint = stepIndex == 0 ? "Step 1 — pick backgrounds & output" :
-                             stepIndex == 1 ? "Step 2 — enter your affirmations" :
-                             "Step 3 — preview and generate";
-            titleLabel.Text = "Affirmation Image Maker — " + headerHint;
-
-            // show/hide save-setup button
-            btnSaveSetup.Visible = setupMode;
-        }
-
-        // keys
-        private void WireKeys()
-        {
-            this.KeyDown += WizardForm_KeyDown;
-        }
-
-        private void WizardForm_KeyDown(object? sender, KeyEventArgs e)
-        {
-            // press F to enter setup mode
-            if (e.KeyCode == Keys.F)
-            {
-                EnterSetupMode();
-                e.Handled = true;
-            }
-            // quick preview: press P when on step 3
-            if (e.KeyCode == Keys.P && stepIndex == 2)
-            {
-                BtnPreview_Click(this, EventArgs.Empty);
-            }
-        }
-
-        private void WizardForm_FormClosing(object? sender, FormClosingEventArgs e)
-        {
-            if (setupMode)
-            {
-                SaveSettings();
-            }
-        }
-
-        private void EnterSetupMode()
-        {
-            setupMode = true;
-            // reveal the setup panel (step 0) and navigate to it
-            stepIndex = 0;
-            UpdateStep();
-            MessageBox.Show("Setup mode: change Output / Font / Colour then click 'Save setup' (top-right). Base image is NOT saved.");
-        }
-
-        private void SaveSettings()
-        {
-            var s = new Settings
-            {
-                OutputFolder = string.IsNullOrWhiteSpace(outputFolderBox.Text) ? null : outputFolderBox.Text,
-                FontPath = string.IsNullOrWhiteSpace(fontPathBox.Text) ? null : fontPathBox.Text,
-                FontSize = fontSizeUp.Value,
-                TextColor = chosenColor.ToArgb(),
-                RandomBase = chkRandomBase.Checked
-            };
-            try
-            {
-                var opts = new JsonSerializerOptions { WriteIndented = true };
-                File.WriteAllText(settingsPath, JsonSerializer.Serialize(s, opts));
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show("Failed to save settings: " + ex.Message);
-            }
-        }
-
-        private void SaveSetupAndExit()
-        {
-            SaveSettings();
-            setupMode = false;
-            UpdateStep();
-            MessageBox.Show("Setup saved.");
-        }
-
-        private void LoadSettingsIfExists()
-        {
-            try
-            {
-                if (!File.Exists(settingsPath)) return;
-                var json = File.ReadAllText(settingsPath);
-                var s = JsonSerializer.Deserialize<Settings>(json);
-                if (s == null) return;
-
-                if (!string.IsNullOrWhiteSpace(s.OutputFolder)) outputFolderBox.Text = s.OutputFolder!;
-                if (!string.IsNullOrWhiteSpace(s.FontPath)) fontPathBox.Text = s.FontPath!;
-                fontSizeUp.Value = s.FontSize >= fontSizeUp.Minimum && s.FontSize <= fontSizeUp.Maximum ? s.FontSize : fontSizeUp.Value;
-                chosenColor = Color.FromArgb(s.TextColor);
-                colorPreview.BackColor = chosenColor;
-                chkRandomBase.Checked = s.RandomBase;
-
-                // NOTE: do NOT change stepIndex here — leave UI on setup so user sees it on load
-            }
-            catch
-            {
-                // ignore load errors
-            }
-        }
-
-        // event handlers & helpers
-
-        private void BtnChooseBase_Click(object? sender, EventArgs e)
-        {
-            using var of = new OpenFileDialog();
-            of.Title = "Select base image (or cancel to pick folder)";
-            of.Filter = "Images|*.png;*.jpg;*.jpeg;*.bmp|All files|*.*";
-            if (of.ShowDialog() == DialogResult.OK)
-            {
-                basePathBox.Text = of.FileName;
-                PopulateBaseList();
-            }
-            else
-            {
-                using var fd = new FolderBrowserDialog();
-                if (fd.ShowDialog() == DialogResult.OK)
-                {
-                    basePathBox.Text = fd.SelectedPath;
-                    PopulateBaseList();
-                }
-            }
-        }
-
-        private void BaseImagesList_SelectedIndexChanged(object? sender, EventArgs e)
-        {
-            // update preview if requested
-            if (stepIndex == 2 && lstAffirmations.Items.Count > 0)
-                BtnPreview_Click(this, EventArgs.Empty);
-        }
-
-        private void PopulateBaseList()
-        {
-            baseImagesList.Items.Clear();
-            var path = basePathBox.Text?.Trim();
-            if (string.IsNullOrWhiteSpace(path))
-            {
-                baseCountLabel.Text = "No images selected";
-                return;
-            }
-            var images = ResolveBaseImages(path);
-            foreach (var im in images) baseImagesList.Items.Add(im);
-            baseCountLabel.Text = $"{images.Count} image(s)";
-
-            // auto-select first so preview uses it when available
-            if (baseImagesList.Items.Count > 0 && baseImagesList.SelectedIndex < 0)
-                baseImagesList.SelectedIndex = 0;
-        }
-
-        private void BtnChooseOutput_Click(object? sender, EventArgs e)
-        {
-            using var fd = new FolderBrowserDialog();
-            if (fd.ShowDialog() == DialogResult.OK) outputFolderBox.Text = fd.SelectedPath;
-        }
-
-        private void BtnChooseFont_Click(object? sender, EventArgs e)
-        {
-            using var of = new OpenFileDialog();
-            of.Filter = "Fonts|*.ttf;*.otf|All|*.*";
-            if (of.ShowDialog() == DialogResult.OK)
-            {
-                fontPathBox.Text = of.FileName;
-                try
-                {
-                    pfc = new PrivateFontCollection();
-                    pfc.AddFontFile(of.FileName);
-                    var ff = pfc.Families.First();
-                    loadedFont?.Dispose();
-                    loadedFont = new Font(ff, (float)fontSizeUp.Value, FontStyle.Regular);
-                }
-                catch (Exception ex) { MessageBox.Show("Failed to load font: " + ex.Message); }
-            }
-        }
-
-        private void BtnChooseColor_Click(object? sender, EventArgs e)
-        {
-            using var cd = new ColorDialog();
-            cd.Color = chosenColor;
-            if (cd.ShowDialog() == DialogResult.OK)
-            {
-                chosenColor = cd.Color;
-                colorPreview.BackColor = chosenColor;
-            }
-        }
-
-        private void BtnAddAff_Click(object? sender, EventArgs e)
-        {
-            var t = txtNewAffirmation.Text.Trim();
-            if (string.IsNullOrEmpty(t)) return;
-            lstAffirmations.Items.Add(t);
-            txtNewAffirmation.Clear();
-        }
-
-        private void BtnRemoveAff_Click(object? sender, EventArgs e)
-        {
-            if (lstAffirmations.SelectedIndex >= 0) lstAffirmations.Items.RemoveAt(lstAffirmations.SelectedIndex);
-        }
-
-        private void BtnLoadList_Click(object? sender, EventArgs e)
-        {
-            using var of = new OpenFileDialog();
-            of.Filter = "Text files|*.txt|All|*.*";
-            if (of.ShowDialog() == DialogResult.OK)
-            {
-                var lines = File.ReadAllLines(of.FileName).Select(s => s.Trim()).Where(s => s.Length > 0).ToArray();
-                lstAffirmations.Items.Clear();
-                lstAffirmations.Items.AddRange(lines);
-            }
-        }
-
-        private void BtnSaveList_Click(object? sender, EventArgs e)
-        {
-            using var sf = new SaveFileDialog();
-            sf.Filter = "Text files|*.txt|All|*.*";
-            if (sf.ShowDialog() == DialogResult.OK)
-            {
-                var items = lstAffirmations.Items.Cast<object>().Select(o => o.ToString() ?? "");
-                File.WriteAllLines(sf.FileName, items);
-            }
-        }
-
-        // improved preview that shows placeholders and auto-selects first base if none selected
-        private void BtnPreview_Click(object? sender, EventArgs e)
-        {
-            if (lstAffirmations.Items.Count == 0)
-            {
-                MessageBox.Show("No affirmations in the list.");
-                return;
-            }
-
-            var idx = Math.Max(0, lstAffirmations.SelectedIndex);
-            var text = lstAffirmations.Items[idx].ToString() ?? "";
-
-            var baseList = ResolveBaseImages(basePathBox.Text);
-            if (baseList.Count == 0)
-            {
-                // show a placeholder telling the user no base is selected
-                var placeholder = CreatePlaceholderPreview("No base image selected\nChoose a file or folder in Setup", previewBox.Width, previewBox.Height);
-                previewBox.Image?.Dispose();
-                previewBox.Image = placeholder;
-                previewBox.Refresh();
-                return;
-            }
-
-            string baseFile;
-            if (baseImagesList.SelectedIndex >= 0)
-                baseFile = baseImagesList.SelectedItem.ToString() ?? baseList[0];
-            else
-                baseFile = baseList[0];
-
-            // if baseImagesList hasn't selected anything but there are items, auto-select the first so user knows what's in the list
-            if (baseImagesList.Items.Count > 0 && baseImagesList.SelectedIndex < 0)
-                baseImagesList.SelectedIndex = 0;
+            // disable UI
+            btnInstall.Enabled = false;
+            btnBrowse.Enabled = false;
+            progressBar.Value = 0;
+            UpdateActionSafe("Preparing...");
+            UpdateStatusSafe("Starting");
 
             try
             {
-                if (!File.Exists(baseFile))
+                // 1) QUICK SYSTEM-WIDE FIND (best-effort, time-limited)
+                UpdateActionSafe("Searching for existing installation...");
+                UpdateStatusSafe("Looking for installed application on system (quick scan)...");
+                var cts = new CancellationTokenSource(SystemScanTimeoutMs);
+                var foundExisting = await Task.Run(() => FindExistingAppAnywhere(cts.Token), cts.Token);
+
+                if (!string.IsNullOrEmpty(foundExisting))
                 {
-                    var placeholder = CreatePlaceholderPreview("Selected base file missing", previewBox.Width, previewBox.Height);
-                    previewBox.Image?.Dispose();
-                    previewBox.Image = placeholder;
-                    previewBox.Refresh();
+                    UpdateActionSafe("Found existing installation");
+                    UpdateStatusSafe($"Launching existing: {Path.GetFileName(foundExisting)}");
+                    LaunchExe(foundExisting, Path.GetDirectoryName(foundExisting));
+                    CloseInstallerWindow();
                     return;
                 }
 
-                using var src = (Bitmap)Image.FromFile(baseFile);
-                var bmp = RenderAffirmationToBitmap(src, text, GetOptions(), previewBox.Width, previewBox.Height);
-                previewBox.Image?.Dispose();
-                previewBox.Image = bmp;
-                previewBox.Refresh();
+                // 2) Continue with install (choose folder)
+                var installPath = txtPath.Text.Trim();
+                if (string.IsNullOrEmpty(installPath))
+                {
+                    MessageBox.Show("Please choose an install folder.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+
+                Directory.CreateDirectory(installPath);
+
+                // If any exe already exists inside chosen folder, just launch and close
+                var existingExeInside = Directory.GetFiles(installPath, "*.exe", SearchOption.AllDirectories).FirstOrDefault();
+                if (!string.IsNullOrEmpty(existingExeInside))
+                {
+                    UpdateActionSafe("Detected application in chosen folder");
+                    UpdateStatusSafe($"Launching: {Path.GetFileName(existingExeInside)}");
+                    LaunchExe(existingExeInside, installPath);
+                    CloseInstallerWindow();
+                    return;
+                }
+
+                // 3) Download + extract
+                string tempFolder = Path.Combine(Path.GetTempPath(), "SimpleInstaller");
+                Directory.CreateDirectory(tempFolder);
+
+                string zipPath = Path.Combine(tempFolder, "Main.zip");
+
+                UpdateActionSafe("Downloading package...");
+                UpdateStatusSafe("Starting download");
+                await DownloadValidatedZipAsync(DownloadUrl, zipPath, new Progress<ProgressInfo>(info =>
+                {
+                    if (info != null)
+                    {
+                        progressBar.Value = Math.Clamp(info.Percent, 0, 100);
+                        UpdateActionSafe(info.ActionText);
+                        UpdateETASafe(info.ETAText);
+                        UpdateStatusSafe(info.StatusText);
+                    }
+                }));
+
+                UpdateActionSafe("Extracting package...");
+                UpdateStatusSafe("Preparing extraction");
+                await Task.Run(() => ExtractZipWithProgress(zipPath, installPath, new Progress<ProgressInfo>(info =>
+                {
+                    if (info != null)
+                    {
+                        progressBar.Value = Math.Clamp(info.Percent, 0, 100);
+                        UpdateActionSafe(info.ActionText);
+                        UpdateETASafe(info.ETAText);
+                        UpdateStatusSafe(info.StatusText);
+                    }
+                })));
+
+                UpdateActionSafe("Cleaning up...");
+                UpdateStatusSafe("Removing temporary files");
+                try { File.Delete(zipPath); } catch { /* ignore */ }
+
+                // 4) Find exe and act
+                var exe = Directory.GetFiles(installPath, "*.exe", SearchOption.AllDirectories).FirstOrDefault();
+                if (exe == null)
+                {
+                    UpdateActionSafe("Installed (no exe found)");
+                    UpdateStatusSafe("Installed, but no .exe was found to run.");
+                    UpdateETASafe("--");
+                    MessageBox.Show("Installed, but no executable (.exe) was found in the package.", "Done", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    // close installer anyway
+                    CloseInstallerWindow();
+                    return;
+                }
+
+                UpdateActionSafe($"Installed. Found: {Path.GetFileName(exe)}");
+                UpdateStatusSafe("Installation complete");
+                UpdateETASafe("--");
+                progressBar.Value = 100;
+
+                if (chkCreateShortcut.Checked)
+                {
+                    TryCreateShortcut(exe);
+                }
+
+                if (chkRunAfter.Checked)
+                {
+                    UpdateActionSafe($"Launching {Path.GetFileName(exe)}...");
+                    LaunchExe(exe, installPath);
+                }
+
+                // close the installer after launching (or completion)
+                CloseInstallerWindow();
+            }
+            catch (OperationCanceledException)
+            {
+                UpdateStatusSafe("System scan timed out. Proceeding with install.");
+                UpdateETASafe("--");
             }
             catch (Exception ex)
             {
-                // show a helpful placeholder instead of nothing
-                var placeholder = CreatePlaceholderPreview("Preview error: " + ex.Message, previewBox.Width, previewBox.Height);
-                previewBox.Image?.Dispose();
-                previewBox.Image = placeholder;
-                previewBox.Refresh();
+                MessageBox.Show("Error: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                UpdateStatusSafe("Error: " + ex.Message);
+                UpdateActionSafe("Error");
+                UpdateETASafe("--");
             }
-        }
-
-        private void BtnGenerate_Click(object? sender, EventArgs e)
-        {
-            if (lstAffirmations.Items.Count == 0) { MessageBox.Show("No affirmations to generate."); return; }
-            var outDir = outputFolderBox.Text;
-            if (string.IsNullOrWhiteSpace(outDir)) { MessageBox.Show("Choose output folder."); return; }
-            Directory.CreateDirectory(outDir);
-            var baseList = ResolveBaseImages(basePathBox.Text);
-            if (baseList.Count == 0) { MessageBox.Show("No base images found."); return; }
-
-            var opts = GetOptions();
-            var rnd = new Random();
-            using var prog = new ProgressForm(lstAffirmations.Items.Count);
-            prog.Show(this);
-
-            for (int i = 0; i < lstAffirmations.Items.Count; i++)
+            finally
             {
-                Application.DoEvents();
-                var text = lstAffirmations.Items[i].ToString() ?? "";
-
-                // if user selected specific base in list, use that for all; otherwise random or first
-                string baseFile;
-                if (baseImagesList.SelectedIndex >= 0)
-                    baseFile = baseImagesList.SelectedItem.ToString() ?? baseList[0];
-                else if (baseList.Count == 1 || !opts.RandomBase)
-                    baseFile = baseList[0];
-                else
-                    baseFile = baseList[rnd.Next(baseList.Count)];
-
-                try
+                // enable UI again only if the window is still open
+                if (!this.IsDisposed && this.Visible)
                 {
-                    using var src = (Bitmap)Image.FromFile(baseFile);
-                    using var bmp = RenderAffirmationToBitmap(src, text, opts, 0, 0);
-                    var filename = $"{opts.Prefix}{i + 1:000}.png";
-                    var outPath = Path.Combine(outDir, filename);
-                    bmp.Save(outPath, ImageFormat.Png);
+                    btnInstall.Enabled = true;
+                    btnBrowse.Enabled = true;
                 }
-                catch (Exception ex)
-                {
-                    MessageBox.Show($"Failed on item {i + 1}: {ex.Message}");
-                }
-                prog.Increment();
             }
-            prog.Close();
-            MessageBox.Show("Done. Check the output folder.");
         }
 
-        private List<string> ResolveBaseImages(string path)
+        private void CloseInstallerWindow()
         {
-            var list = new List<string>();
-            if (string.IsNullOrWhiteSpace(path)) return list;
-            if (File.Exists(path)) { list.Add(path); return list; }
-            if (Directory.Exists(path))
+            // Give a tiny moment for UI to update, then close
+            Task.Run(async () =>
             {
-                var exts = new[] { ".png", ".jpg", ".jpeg", ".bmp" };
-                foreach (var f in Directory.EnumerateFiles(path))
-                    if (exts.Contains(Path.GetExtension(f).ToLowerInvariant())) list.Add(f);
-            }
-            return list;
-        }
-
-        private Options GetOptions()
-        {
-            return new Options
-            {
-                FontFile = fontPathBox.Text,
-                FontSize = (float)fontSizeUp.Value,
-                Color = chosenColor,
-                X = 30,
-                Y = 0,
-                Width = 0,
-                Height = 0,
-                RandomBase = chkRandomBase.Checked,
-                Prefix = "affirmation_"
-            };
-        }
-
-        private System.Drawing.Bitmap RenderAffirmationToBitmap(Bitmap srcImage, string text, Options opts, int previewW, int previewH)
-        {
-            int outW = opts.Width > 0 ? opts.Width : srcImage.Width;
-            int outH = opts.Height > 0 ? opts.Height : srcImage.Height;
-
-            if (previewW > 0 && previewH > 0)
-            {
-                var tmp = RenderAffirmationToBitmap(srcImage, text, opts, 0, 0);
-                var scaled = new Bitmap(previewW, previewH);
-                using var g = Graphics.FromImage(scaled);
-                g.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
-                g.Clear(Color.Black);
-                g.DrawImage(tmp, 0, 0, previewW, previewH);
-                tmp.Dispose();
-                return scaled;
-            }
-
-            var dst = new Bitmap(outW, outH);
-            using (var g = Graphics.FromImage(dst))
-            {
-                g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAliasGridFit;
-                g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.HighQuality;
-                g.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
-
-                g.Clear(Color.Black);
-                g.DrawImage(srcImage, 0, 0, outW, outH);
-
-                Font drawFont;
-                if (!string.IsNullOrWhiteSpace(opts.FontFile) && File.Exists(opts.FontFile))
+                await Task.Delay(300);
+                if (this.IsHandleCreated && !this.IsDisposed)
                 {
                     try
                     {
-                        var localPfc = new PrivateFontCollection();
-                        localPfc.AddFontFile(opts.FontFile);
-                        var ff = localPfc.Families.First();
-                        drawFont = new Font(ff, opts.FontSize, FontStyle.Bold, GraphicsUnit.Point);
+                        this.BeginInvoke(new Action(() => { this.Close(); }));
                     }
-                    catch
+                    catch { }
+                }
+            });
+        }
+
+        private string FindExistingAppAnywhere(CancellationToken ct)
+        {
+            // Best-effort search: check a set of common folders and then BFS limited scan of logical drives.
+            // Will return first matching exe path or null.
+            var candidates = new List<string>();
+
+            // check common special folders quickly
+            var checkFolders = new[]
+            {
+                Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
+                Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86),
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
+                Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory),
+                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)
+            }.Where(p => !string.IsNullOrEmpty(p)).Distinct().ToList();
+
+            // quick scan: look for exe names containing tokens in those folders non-recursively then shallow recursion
+            foreach (var folder in checkFolders)
+            {
+                if (ct.IsCancellationRequested) return null;
+                try
+                {
+                    // check top-level files
+                    foreach (var f in Directory.EnumerateFiles(folder, "*.exe", SearchOption.TopDirectoryOnly))
                     {
-                        drawFont = new Font(FontFamily.GenericSansSerif, opts.FontSize, FontStyle.Bold, GraphicsUnit.Point);
+                        if (ct.IsCancellationRequested) return null;
+                        if (FileNameMatchesTokens(Path.GetFileName(f)))
+                            return f;
+                        if (FileMetadataMatchesTokens(f))
+                            return f;
+                    }
+
+                    // shallow subdirs
+                    foreach (var sub in Directory.EnumerateDirectories(folder))
+                    {
+                        if (ct.IsCancellationRequested) return null;
+                        try
+                        {
+                            foreach (var f in Directory.EnumerateFiles(sub, "*.exe", SearchOption.TopDirectoryOnly))
+                            {
+                                if (ct.IsCancellationRequested) return null;
+                                if (FileNameMatchesTokens(Path.GetFileName(f)))
+                                    return f;
+                                if (FileMetadataMatchesTokens(f))
+                                    return f;
+                            }
+                        }
+                        catch { /* skip inaccessible */ }
                     }
                 }
-                else
+                catch { /* skip inaccessible */ }
+            }
+
+            // BFS across logical drives but bounded (# directories visited) and time-limited via CancellationToken
+            int maxDirsToVisit = 4000;
+            var visited = 0;
+            var q = new Queue<string>();
+            foreach (var drive in DriveInfo.GetDrives())
+            {
+                if (!drive.IsReady) continue;
+                q.Enqueue(drive.RootDirectory.FullName);
+            }
+
+            while (q.Count > 0 && visited < maxDirsToVisit)
+            {
+                if (ct.IsCancellationRequested) return null;
+                var dir = q.Dequeue();
+                visited++;
+
+                IEnumerable<string> files = null;
+                try { files = Directory.EnumerateFiles(dir, "*.exe", SearchOption.TopDirectoryOnly); }
+                catch { continue; }
+
+                foreach (var f in files)
                 {
-                    drawFont = new Font("Segoe UI Semibold", opts.FontSize, FontStyle.Bold, GraphicsUnit.Point);
+                    if (ct.IsCancellationRequested) return null;
+                    var name = Path.GetFileName(f);
+                    if (FileNameMatchesTokens(name)) return f;
+                    if (FileMetadataMatchesTokens(f)) return f;
                 }
 
-                var rect = new RectangleF(opts.X, opts.Y, outW - opts.X * 2, outH - opts.Y * 2);
-                using var sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
-
-                using var textBrush = new SolidBrush(opts.Color);
-                using var outlineBrush = new SolidBrush(Color.FromArgb(220, 0, 0, 0));
-
-                for (int ox = -2; ox <= 2; ox++)
-                    for (int oy = -2; oy <= 2; oy++)
-                    {
-                        if (Math.Abs(ox) + Math.Abs(oy) == 0) continue;
-                        g.DrawString(text, drawFont, outlineBrush, new RectangleF(rect.X + ox, rect.Y + oy, rect.Width, rect.Height), sf);
-                    }
-                g.DrawString(text, drawFont, textBrush, rect, sf);
-
-                drawFont.Dispose();
-            }
-            return dst;
-        }
-
-        // placeholder preview generator
-        private Bitmap CreatePlaceholderPreview(string message, int w, int h)
-        {
-            int width = Math.Max(240, w);
-            int height = Math.Max(160, h);
-            var bmp = new Bitmap(width, height);
-            using (var g = Graphics.FromImage(bmp))
-            {
-                g.Clear(Color.FromArgb(250, 250, 252));
-                g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.HighQuality;
-                using var b = new SolidBrush(Color.FromArgb(170, 170, 170));
-                using var f = new Font("Segoe UI", 12f, FontStyle.Regular, GraphicsUnit.Point);
-                var rc = new Rectangle(0, 0, width, height);
-                var sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
-                g.DrawString(message, f, b, rc, sf);
-            }
-            return bmp;
-        }
-
-        private class ProgressForm : Form
-        {
-            private ProgressBar pb;
-            public ProgressForm(int max)
-            {
-                Text = "Generating";
-                Width = 420; Height = 120; StartPosition = FormStartPosition.CenterParent;
-                pb = new ProgressBar { Minimum = 0, Maximum = max, Dock = DockStyle.Fill };
-                Controls.Add(pb);
-            }
-            public void Increment() => Invoke((Action)(() => { if (pb.Value < pb.Maximum) pb.Value += 1; }));
-        }
-
-        public static class Prompt
-        {
-            public static string? ShowDialog(string text, string caption, string value = "")
-            {
-                Form prompt = new Form()
+                // enqueue subdirectories (limited)
+                try
                 {
-                    Width = 600, Height = 180, Text = caption, StartPosition = FormStartPosition.CenterParent
+                    foreach (var sub in Directory.EnumerateDirectories(dir, "*", SearchOption.TopDirectoryOnly))
+                    {
+                        if (ct.IsCancellationRequested) return null;
+                        // cheap filter: skip hidden/reparse points and system folders using attributes
+                        try
+                        {
+                            var attr = File.GetAttributes(sub);
+                            if ((attr & FileAttributes.ReparsePoint) != 0) continue;
+                            if ((attr & FileAttributes.Hidden) != 0) continue;
+                        }
+                        catch { /* ignore */ }
+
+                        q.Enqueue(sub);
+                    }
+                }
+                catch { /* ignore inaccessible directories */ }
+            }
+
+            return null;
+        }
+
+        private bool FileNameMatchesTokens(string fileName)
+        {
+            if (string.IsNullOrEmpty(fileName)) return false;
+            var low = fileName.ToLowerInvariant();
+            foreach (var t in FilenameTokensToFind)
+            {
+                if (low.Contains(t.ToLowerInvariant()) && low.EndsWith(".exe")) return true;
+            }
+            // Also treat common names
+            if (low == "main.exe" || low == "app.exe" || low == "setup.exe") return true;
+            return false;
+        }
+
+        private bool FileMetadataMatchesTokens(string filePath)
+        {
+            try
+            {
+                var v = FileVersionInfo.GetVersionInfo(filePath);
+                var fields = new[] { v.CompanyName, v.ProductName, v.FileDescription };
+                foreach (var f in fields)
+                {
+                    if (string.IsNullOrEmpty(f)) continue;
+                    var low = f.ToLowerInvariant();
+                    foreach (var t in FilenameTokensToFind)
+                    {
+                        if (low.Contains(t.ToLowerInvariant())) return true;
+                    }
+                }
+            }
+            catch { }
+            return false;
+        }
+
+        private void LaunchExe(string exePath, string workingDirectory)
+        {
+            try
+            {
+                var psi = new ProcessStartInfo(exePath)
+                {
+                    WorkingDirectory = workingDirectory,
+                    UseShellExecute = true
                 };
-                Label textLabel = new Label() { Left = 20, Top = 20, Text = text, Width = 540 };
-                TextBox txt = new TextBox() { Left = 20, Top = 50, Width = 540 };
-                txt.Text = value;
-                Button ok = new Button() { Text = "OK", Left = 360, Width = 90, Top = 85, DialogResult = DialogResult.OK };
-                Button cancel = new Button() { Text = "Cancel", Left = 460, Width = 90, Top = 85, DialogResult = DialogResult.Cancel };
-                prompt.AcceptButton = ok; prompt.CancelButton = cancel;
-                prompt.Controls.AddRange(new Control[] { textLabel, txt, ok, cancel });
-                return prompt.ShowDialog() == DialogResult.OK ? txt.Text : null;
+                Process.Start(psi);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Failed to launch executable: " + ex.Message, "Launch error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
         }
 
-        private class Options
+        #region Extraction with progress/ETA
+
+        private void ExtractZipWithProgress(string zipPath, string destFolder, IProgress<ProgressInfo> progress)
         {
-            public string FontFile = "";
-            public float FontSize = 56f;
-            public Color Color = Color.White;
-            public int X = 30;
-            public int Y = 0;
-            public int Width = 0;
-            public int Height = 0;
-            public bool RandomBase = true;
-            public string Prefix = "affirmation_";
+            UpdateActionSafe("Opening ZIP...");
+            Directory.CreateDirectory(destFolder);
+
+            using var archive = ZipFile.OpenRead(zipPath);
+            long totalBytes = archive.Entries.Where(e => !string.IsNullOrEmpty(e.Name)).Sum(e => e.Length);
+            if (totalBytes == 0) totalBytes = 1;
+
+            long extractedBytes = 0;
+            var sw = Stopwatch.StartNew();
+            const int bufferSize = 81920;
+
+            foreach (var entry in archive.Entries)
+            {
+                var entryName = entry.FullName;
+                if (string.IsNullOrEmpty(entry.Name))
+                {
+                    var dirPath = Path.Combine(destFolder, entryName);
+                    Directory.CreateDirectory(dirPath);
+                    continue;
+                }
+
+                string destPath = Path.Combine(destFolder, entryName);
+                Directory.CreateDirectory(Path.GetDirectoryName(destPath));
+
+                UpdateProgress(progress, extractedBytes, totalBytes, $"Extracting: {entryName}", sw.Elapsed);
+
+                using var src = entry.Open();
+                using var dst = File.Open(destPath, FileMode.Create, FileAccess.Write, FileShare.None);
+                var buffer = new byte[bufferSize];
+                int read;
+                while ((read = src.Read(buffer, 0, buffer.Length)) > 0)
+                {
+                    dst.Write(buffer, 0, read);
+                    extractedBytes += read;
+                    UpdateProgress(progress, extractedBytes, totalBytes, $"Extracting: {entryName}", sw.Elapsed);
+                }
+            }
+
+            sw.Stop();
+            UpdateProgress(progress, totalBytes, totalBytes, "Extraction complete", sw.Elapsed);
+        }
+
+        #endregion
+
+        #region Download with validation (slimmed) + Drive fallback retained
+
+        private async Task DownloadValidatedZipAsync(string url, string destFilePath, IProgress<ProgressInfo> progress = null)
+        {
+            // 1) Try simple direct download
+            await DownloadFromUrlSimpleAsync(url, destFilePath, progress);
+
+            // 2) Quick magic-bytes check + try opening
+            if (IsLikelyValidZip(destFilePath))
+            {
+                try
+                {
+                    using var z = ZipFile.OpenRead(destFilePath);
+                    return; // valid ZIP, done
+                }
+                catch
+                {
+                    // fall through to fallback
+                }
+            }
+
+            // 3) Try Google Drive fallback if URL contains an ID (kept for robustness)
+            UpdateStatusSafe("Downloaded file is not a valid ZIP; attempting Google Drive fallback (if applicable)...");
+            string fileId = GetDriveFileIdFromUrl(url);
+            if (!string.IsNullOrEmpty(fileId))
+            {
+                await DownloadFileFromGoogleDriveAsync(fileId, destFilePath, progress);
+                if (IsLikelyValidZip(destFilePath))
+                {
+                    try { using var z = ZipFile.OpenRead(destFilePath); return; }
+                    catch { /* still invalid */ }
+                }
+            }
+
+            // 4) Last resort: give clear error
+            throw new InvalidOperationException("Downloaded file is not a valid ZIP archive. The server may have returned an HTML page or the download was corrupted. Try opening the download URL in a browser.");
+        }
+
+        private async Task DownloadFromUrlSimpleAsync(string url, string destFilePath, IProgress<ProgressInfo> progress = null)
+        {
+            using var client = new HttpClient();
+            using var resp = await client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
+            resp.EnsureSuccessStatusCode();
+
+            var total = resp.Content.Headers.ContentLength ?? -1L;
+            using var input = await resp.Content.ReadAsStreamAsync();
+            using var output = new FileStream(destFilePath, FileMode.Create, FileAccess.Write, FileShare.None);
+
+            var buffer = new byte[81920];
+            long read = 0;
+            int r;
+            var sw = Stopwatch.StartNew();
+            var lastReport = DateTime.UtcNow;
+            while ((r = await input.ReadAsync(buffer, 0, buffer.Length)) > 0)
+            {
+                await output.WriteAsync(buffer, 0, r);
+                read += r;
+                if ((DateTime.UtcNow - lastReport).TotalMilliseconds >= 100 || read == total)
+                {
+                    lastReport = DateTime.UtcNow;
+                    string statusText = $"{read / 1024:N0} KB downloaded";
+                    int percent = total > 0 ? (int)((read * 100L) / total) : 0;
+
+                    string etaText = "--";
+                    if (total > 0 && sw.Elapsed.TotalSeconds > 0)
+                    {
+                        double speed = read / sw.Elapsed.TotalSeconds; // bytes/sec
+                        long remaining = total - read;
+                        double etaSec = speed > 0 ? (remaining / speed) : double.PositiveInfinity;
+                        etaText = SafeFormatEta(etaSec);
+                        statusText += $" ({FormatBytes((long)speed)}/s)";
+                    }
+
+                    progress?.Report(new ProgressInfo
+                    {
+                        Percent = percent,
+                        ActionText = $"Downloading ({percent}%)",
+                        ETAText = etaText,
+                        StatusText = statusText
+                    });
+                }
+            }
+
+            sw.Stop();
+            progress?.Report(new ProgressInfo
+            {
+                Percent = 100,
+                ActionText = "Downloading (100%)",
+                ETAText = "Done",
+                StatusText = "Download complete."
+            });
+        }
+
+        private async Task DownloadFileFromGoogleDriveAsync(string fileId, string destFilePath, IProgress<ProgressInfo> progress = null)
+        {
+            var handler = new HttpClientHandler { AllowAutoRedirect = false, UseCookies = true, CookieContainer = new System.Net.CookieContainer() };
+            using var client = new HttpClient(handler);
+
+            string baseUrl = $"https://drive.google.com/uc?export=download&id={fileId}";
+            using (var initialResponse = await client.GetAsync(baseUrl))
+            {
+                if (IsDirectDownload(initialResponse))
+                {
+                    await SaveResponseContentToFileAsync(initialResponse, destFilePath, progress, "Downloading");
+                    return;
+                }
+
+                var html = await initialResponse.Content.ReadAsStringAsync();
+                var token = ExtractConfirmToken(html);
+
+                if (string.IsNullOrEmpty(token))
+                {
+                    if (initialResponse.StatusCode == System.Net.HttpStatusCode.Found || initialResponse.StatusCode == System.Net.HttpStatusCode.Redirect)
+                    {
+                        var redirect = initialResponse.Headers.Location?.ToString();
+                        if (!string.IsNullOrEmpty(redirect))
+                        {
+                            using var resp2 = await client.GetAsync(redirect);
+                            if (IsDirectDownload(resp2))
+                            {
+                                await SaveResponseContentToFileAsync(resp2, destFilePath, progress, "Downloading");
+                                return;
+                            }
+                            html = await resp2.Content.ReadAsStringAsync();
+                            token = ExtractConfirmToken(html);
+                        }
+                    }
+                }
+
+                if (!string.IsNullOrEmpty(token))
+                {
+                    string urlWithConfirm = $"https://drive.google.com/uc?export=download&confirm={token}&id={fileId}";
+                    using var finalResp = await client.GetAsync(urlWithConfirm, HttpCompletionOption.ResponseHeadersRead);
+                    if (IsDirectDownload(finalResp))
+                    {
+                        await SaveResponseContentToFileAsync(finalResp, destFilePath, progress, "Downloading");
+                        return;
+                    }
+                    await SaveResponseContentToFileAsync(finalResp, destFilePath, progress, "Downloading");
+                    return;
+                }
+
+                using var fallback = await client.GetAsync(baseUrl, HttpCompletionOption.ResponseHeadersRead);
+                await SaveResponseContentToFileAsync(fallback, destFilePath, progress, "Downloading");
+            }
+        }
+
+        private static bool IsDirectDownload(System.Net.Http.HttpResponseMessage resp)
+        {
+            if (resp == null) return false;
+            if (resp.Content?.Headers?.ContentDisposition != null) return true;
+            var ct = resp.Content?.Headers?.ContentType?.MediaType;
+            if (!string.IsNullOrEmpty(ct) && (ct == "application/zip" || ct == "application/octet-stream")) return true;
+            return false;
+        }
+
+        private static string ExtractConfirmToken(string html)
+        {
+            if (string.IsNullOrEmpty(html)) return null;
+            var m = Regex.Match(html, @"confirm=([0-9A-Za-z_-]+)&amp;id=");
+            if (m.Success) return m.Groups[1].Value;
+            m = Regex.Match(html, @"confirm=([0-9A-Za-z_-]+)&");
+            if (m.Success) return m.Groups[1].Value;
+            m = Regex.Match(html, @"\bconfirm=([0-9A-Za-z_-]+)\b");
+            if (m.Success) return m.Groups[1].Value;
+            m = Regex.Match(html, @"download_warning[^\w]*([0-9A-Za-z_-]+)");
+            if (m.Success) return m.Groups[1].Value;
+            return null;
+        }
+
+        private async Task SaveResponseContentToFileAsync(System.Net.Http.HttpResponseMessage response, string filePath, IProgress<ProgressInfo> progress = null, string actionLabel = "Downloading")
+        {
+            response.EnsureSuccessStatusCode();
+
+            var total = response.Content.Headers.ContentLength ?? -1L;
+            using var input = await response.Content.ReadAsStreamAsync();
+            using var output = new FileStream(filePath, FileMode.Create, FileAccess.Write, FileShare.None);
+
+            var buffer = new byte[81920];
+            long read = 0;
+            int r;
+            var sw = Stopwatch.StartNew();
+            var lastReport = DateTime.UtcNow;
+            while ((r = await input.ReadAsync(buffer, 0, buffer.Length)) > 0)
+            {
+                await output.WriteAsync(buffer, 0, r);
+                read += r;
+                if ((DateTime.UtcNow - lastReport).TotalMilliseconds >= 100 || read == total)
+                {
+                    lastReport = DateTime.UtcNow;
+                    string statusText = $"{read / 1024:N0} KB downloaded";
+                    int percent = total > 0 ? (int)((read * 100L) / total) : 0;
+
+                    string etaText = "--";
+                    if (total > 0 && sw.Elapsed.TotalSeconds > 0)
+                    {
+                        double speed = read / sw.Elapsed.TotalSeconds; // bytes/sec
+                        long remaining = total - read;
+                        double etaSec = speed > 0 ? (remaining / speed) : double.PositiveInfinity;
+                        etaText = SafeFormatEta(etaSec);
+                        statusText += $" ({FormatBytes((long)speed)}/s)";
+                    }
+
+                    progress?.Report(new ProgressInfo
+                    {
+                        Percent = percent,
+                        ActionText = $"{actionLabel} ({percent}%)",
+                        ETAText = etaText,
+                        StatusText = statusText
+                    });
+                }
+            }
+
+            sw.Stop();
+            progress?.Report(new ProgressInfo
+            {
+                Percent = 100,
+                ActionText = $"{actionLabel} (100%)",
+                ETAText = "Done",
+                StatusText = "Download complete."
+            });
+        }
+
+        // Extract file id from a Drive url or query (?id= or /d/<id>/)
+        private string GetDriveFileIdFromUrl(string url)
+        {
+            if (string.IsNullOrEmpty(url)) return null;
+            var m = Regex.Match(url, @"[?&]id=([A-Za-z0-9_\-]+)");
+            if (m.Success) return m.Groups[1].Value;
+            m = Regex.Match(url, @"/d/([A-Za-z0-9_\-]+)");
+            return m.Success ? m.Groups[1].Value : null;
+        }
+
+        private bool IsLikelyValidZip(string path)
+        {
+            try
+            {
+                using var fs = File.OpenRead(path);
+                if (fs.Length < 4) return false;
+                Span<byte> b = stackalloc byte[4];
+                fs.Read(b);
+                // PK\x03\x04 or PK\x05\x06 or PK\x07\x08
+                return b[0] == 0x50 && b[1] == 0x4B;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        #endregion
+
+        #region Helpers & UI updates
+
+        private void UpdateProgress(IProgress<ProgressInfo> progress, long done, long total, string action, TimeSpan elapsed)
+        {
+            int percent = total > 0 ? (int)((done * 100L) / total) : 0;
+            string eta = "--";
+            if (elapsed.TotalSeconds > 0 && total > 0)
+            {
+                double speed = done / elapsed.TotalSeconds;
+                long remaining = Math.Max(0, total - done);
+                double etaSeconds = speed > 0 ? remaining / speed : double.PositiveInfinity;
+                eta = SafeFormatEta(etaSeconds);
+            }
+            progress?.Report(new ProgressInfo
+            {
+                Percent = percent,
+                ActionText = action,
+                ETAText = eta,
+                StatusText = $"{done / 1024:N0} KB / {total / 1024:N0} KB"
+            });
+        }
+
+        private void UpdateActionSafe(string text)
+        {
+            if (lblAction.InvokeRequired) lblAction.Invoke(new Action(() => lblAction.Text = $"Action: {text}"));
+            else lblAction.Text = $"Action: {text}";
+        }
+
+        private void UpdateETASafe(string text)
+        {
+            if (lblETA.InvokeRequired) lblETA.Invoke(new Action(() => lblETA.Text = $"ETA: {text}"));
+            else lblETA.Text = $"ETA: {text}";
+        }
+
+        private void UpdateStatusSafe(string text)
+        {
+            if (lblStatus.InvokeRequired) lblStatus.Invoke(new Action(() => lblStatus.Text = $"Status: {text}"));
+            else lblStatus.Text = $"Status: {text}";
+        }
+
+        private static string FormatTimeSpan(TimeSpan ts)
+        {
+            if (double.IsInfinity(ts.TotalSeconds) || ts.TotalSeconds < 0) return "--";
+            if (ts.TotalHours >= 1) return $"{(int)ts.TotalHours}h {ts.Minutes}m";
+            if (ts.TotalMinutes >= 1) return $"{(int)ts.TotalMinutes}m {ts.Seconds}s";
+            return $"{ts.Seconds}s";
+        }
+
+        // Safely format an ETA in seconds to a friendly string, guarding against overflow/NaN/Infinity
+        private static string SafeFormatEta(double etaSec)
+        {
+            if (double.IsNaN(etaSec) || double.IsInfinity(etaSec) || etaSec < 0)
+                return "--";
+
+            // Protect against values larger than TimeSpan.MaxValue.TotalSeconds
+            if (etaSec > TimeSpan.MaxValue.TotalSeconds)
+                return "--";
+
+            return FormatTimeSpan(TimeSpan.FromSeconds(etaSec));
+        }
+
+        private static string FormatBytes(long bytes)
+        {
+            if (bytes > 1_000_000_000) return $"{bytes / 1_000_000_000.0:F2} GB";
+            if (bytes > 1_000_000) return $"{bytes / 1_000_000.0:F2} MB";
+            if (bytes > 1000) return $"{bytes / 1000.0:F2} KB";
+            return $"{bytes} B";
+        }
+
+        #endregion
+
+        #region Shortcut creation
+
+        private void TryCreateShortcut(string targetExePath)
+        {
+            try
+            {
+                string desktop = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
+                string exeName = Path.GetFileNameWithoutExtension(targetExePath);
+                string lnkPath = Path.Combine(desktop, exeName + ".lnk");
+                CreateShortcut(lnkPath, targetExePath, Path.GetDirectoryName(targetExePath), $"Shortcut to {exeName}");
+                UpdateStatusSafe($"Shortcut created: {Path.GetFileName(lnkPath)}");
+            }
+            catch (Exception ex)
+            {
+                UpdateStatusSafe("Shortcut creation failed: " + ex.Message);
+            }
+        }
+
+        // Uses WScript.Shell COM object via dynamic to create .lnk file (works on Windows)
+        private void CreateShortcut(string shortcutPath, string targetPath, string workingDirectory, string description)
+        {
+            // If a previous shortcut exists, overwrite it
+            try { if (File.Exists(shortcutPath)) File.Delete(shortcutPath); } catch { }
+
+            Type t = Type.GetTypeFromProgID("WScript.Shell");
+            if (t == null) throw new InvalidOperationException("WScript.Shell not available on this system.");
+            dynamic shell = Activator.CreateInstance(t);
+            dynamic shortcut = shell.CreateShortcut(shortcutPath);
+            shortcut.TargetPath = targetPath;
+            shortcut.WorkingDirectory = workingDirectory;
+            shortcut.WindowStyle = 1;
+            shortcut.Description = description;
+            // Optionally: shortcut.IconLocation = targetPath + ",0";
+            shortcut.Save();
+        }
+
+        #endregion
+
+        private class ProgressInfo
+        {
+            public int Percent { get; set; }
+            public string ActionText { get; set; }
+            public string ETAText { get; set; }
+            public string StatusText { get; set; }
         }
     }
 }
