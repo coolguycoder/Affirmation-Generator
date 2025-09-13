@@ -19,9 +19,9 @@ jobs:
       - name: Build x64 executable
         run: |
           mkdir output
-          dotnet build "Installer/Installer Win.csproj" -c Release -o output/installer
+          dotnet publish "Installer/Installer Win.csproj" -c Release -r win-x64 --self-contained true -o output/installer
           # Build the app project and output next to installer outputs
-          dotnet build "app/app.csproj" -c Release -o output/app
+          dotnet publish "app/app.csproj" -c Release -r win-x64 --self-contained true -o output/app
           # If the build produces .bin files, compress them. Otherwise, fall back to any .exe.
           pushd output
           # Include both installer and app outputs in the zip
@@ -50,9 +50,9 @@ jobs:
       - name: Build ARM64 executable
         run: |
           mkdir output
-          dotnet build "Installer/Installer Win.csproj" -c Release -o output/installer
+          dotnet publish "Installer/Installer Win.csproj" -c Release -r win-arm64 --self-contained true -o output/installer
           # Build the app project
-          dotnet build "app/app.csproj" -c Release -o output/app
+          dotnet publish "app/app.csproj" -c Release -r win-arm64 --self-contained true -o output/app
           # Compress .bin files into a zip; if none exist, include produced artifacts
           pushd output
           if (Test-Path -Path "installer\*.bin" -or Test-Path -Path "app\*.bin") {
