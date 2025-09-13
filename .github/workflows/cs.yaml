@@ -16,28 +16,29 @@ jobs:
       - name: Set up .NET
         uses: actions/setup-dotnet@v5.0.0
 
-      - name: Build x64 executable
+      - name: Build and package x64
         run: |
-          mkdir output
+          # Build and package installer
           dotnet publish "Installer/Installer Win.csproj" -c Release -r win-x64 --self-contained true -o output/installer
-          # Build the app project and output next to installer outputs
-          dotnet publish "app/app.csproj" -c Release -r win-x64 --self-contained true -o output/app
-          # If the build produces .bin files, compress them. Otherwise, fall back to any .exe.
-          pushd output
-          # Include both installer and app outputs in the zip
-          if (Test-Path -Path "installer\*.bin" -or Test-Path -Path "app\*.bin") {
-            Compress-Archive -Path installer\*.bin,app\*.bin -DestinationPath ..\AffirmationImageGenerator-x64.zip -Force
-          } else {
-            # include all produced artifacts (exes, dlls, etc.)
-            Compress-Archive -Path * -DestinationPath ..\AffirmationImageGenerator-x64.zip -Force
-          }
-          popd
+          Compress-Archive -Path output/installer -DestinationPath installer-x64.zip -Force
 
-      - name: Upload x64 artifact (zip)
+          # Build and package app
+          pushd app
+          dotnet build -c Release -r win-x64
+          popd
+          Compress-Archive -Path app/bin -DestinationPath app-x64.zip -Force
+
+      - name: Upload x64 installer artifact
         uses: actions/upload-artifact@v4.6.2
         with:
-          name: x64-zip
-          path: AffirmationImageGenerator-x64.zip
+          name: installer-x64-zip
+          path: installer-x64.zip
+
+      - name: Upload x64 app artifact
+        uses: actions/upload-artifact@v4.6.2
+        with:
+          name: app-x64-zip
+          path: app-x64.zip
 
   build-windows-arm64:
     runs-on: windows-11-arm
@@ -47,26 +48,29 @@ jobs:
       - name: Set up .NET
         uses: actions/setup-dotnet@v5.0.0
 
-      - name: Build ARM64 executable
+      - name: Build and package ARM64
         run: |
-          mkdir output
+          # Build and package installer
           dotnet publish "Installer/Installer Win.csproj" -c Release -r win-arm64 --self-contained true -o output/installer
-          # Build the app project
-          dotnet publish "app/app.csproj" -c Release -r win-arm64 --self-contained true -o output/app
-          # Compress .bin files into a zip; if none exist, include produced artifacts
-          pushd output
-          if (Test-Path -Path "installer\*.bin" -or Test-Path -Path "app\*.bin") {
-            Compress-Archive -Path installer\*.bin,app\*.bin -DestinationPath ..\AffirmationImageGenerator-aarch64.zip -Force
-          } else {
-            Compress-Archive -Path * -DestinationPath ..\AffirmationImageGenerator-aarch64.zip -Force
-          }
-          popd
+          Compress-Archive -Path output/installer -DestinationPath installer-arm64.zip -Force
 
-      - name: Upload ARM64 artifact (zip)
+          # Build and package app
+          pushd app
+          dotnet build -c Release -r win-arm64
+          popd
+          Compress-Archive -Path app/bin -DestinationPath app-arm64.zip -Force
+
+      - name: Upload ARM64 installer artifact
         uses: actions/upload-artifact@v4.6.2
         with:
-          name: arm64-zip
-          path: AffirmationImageGenerator-aarch64.zip
+          name: installer-arm64-zip
+          path: installer-arm64.zip
+      
+      - name: Upload ARM64 app artifact
+        uses: actions/upload-artifact@v4.6.2
+        with:
+          name: app-arm64-zip
+          path: app-arm64.zip
 
   release:
     needs: [build-windows-x64, build-windows-arm64]
@@ -75,17 +79,29 @@ jobs:
       contents: write
 
     steps:
-      - name: Download x64 artifact
+      - name: Download installer-x64 artifact
         uses: actions/download-artifact@v4
         with:
-          name: x64-zip
-          path: release_artifacts/x64
+          name: installer-x64-zip
+          path: release_artifacts/x64-installer
 
-      - name: Download ARM64 artifact
+      - name: Download app-x64 artifact
         uses: actions/download-artifact@v4
         with:
-          name: arm64-zip
-          path: release_artifacts/arm64
+          name: app-x64-zip
+          path: release_artifacts/x64-app
+
+      - name: Download installer-arm64 artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: installer-arm64-zip
+          path: release_artifacts/arm64-installer
+
+      - name: Download app-arm64 artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: app-arm64-zip
+          path: release_artifacts/arm64-app
 
       - name: Verify downloaded files
         run: |
@@ -100,9 +116,11 @@ jobs:
             ## Release Notes for ${{ inputs.tag }}
 
             This release includes the following binaries:
-            - Windows x64
-            - Windows ARM64
+            - Windows x64 (Installer and App)
+            - Windows ARM64 (Installer and App)
           artifacts: |
-            release_artifacts/x64/AffirmationImageGenerator-x64.zip
-            release_artifacts/arm64/AffirmationImageGenerator-aarch64.zip
+            release_artifacts/x64-installer/installer-x64.zip
+            release_artifacts/x64-app/app-x64.zip
+            release_artifacts/arm64-installer/installer-arm64.zip
+            release_artifacts/arm64-app/app-arm64.zip
           token: ${{ secrets.GITHUB_TOKEN }}
