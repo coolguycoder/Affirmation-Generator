@@ -36,8 +36,8 @@ jobs:
     - name: upload artifact
       uses: actions/upload-artifact@v4.6.2
       with:
-        name: AffirmationImageGenerator.exe
-        path: AffirmationImageGenerator.exe
+        name: AffirmationImageGenerator-aarch64.exe
+        path: AffirmationImageGenerator-aarch64.exe
         
   release:
     needs: [build-windows-x64, build-windows-arm64]
@@ -49,7 +49,6 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: release_artifacts
-
       - name: Create release
         uses: ncipollo/release-action@v1
         with:
