@@ -16,5 +16,5 @@ You can either compile the installer manually or use our precompiled binaries.
 ## FAQs
 <details>
 <summary>How do I uninistall this?</summary>
-Simple! **You don't...**
+  Simple! **You don't...**
 </details>
