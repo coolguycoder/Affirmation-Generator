@@ -1,1 +1,62 @@
+# This workflow will build a c# project
 
+name: C#
+
+on:
+  workflow_dispatch:
+  
+jobs:
+
+  build-windows-x64:
+    runs-on: windows-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up C#
+      uses: actions/setup-dotnet@v5.0.0
+    - name: Build artifact
+      run: dotnet build -o AffirmationImageGenerator-x64.exe
+    - name: upload artifact
+      uses: actions/upload-artifact@v4.6.2
+      with:
+        name: AAffirmationImageGenerator-x64.exe
+        path: AffirmationImageGenerator-x64.exe
+
+  build-windows-arm64:
+    runs-on: windows-11-arm
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up C#
+      uses: actions/setup-dotnet@v5.0.0
+    - name: Build artifact
+      run: dotnet build
+    - name: upload artifact
+      uses: actions/upload-artifact@v4.6.2
+      with:
+        name: AffirmationImageGenerator.exe
+        path: AffirmationImageGenerator.exe
+        
+  release:
+    needs: [build-windows-x64, build-windows-arm64]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release_artifacts
+
+      - name: Create release
+        uses: ncipollo/release-action@v1
+        with:
+          tag: ${{ github.ref_name }}
+          name: Release ${{ github.ref_name }}
+          body: |
+            ## Release Notes for ${{ github.ref_name }}
+            
+            This release includes the following binaries:
+            - Windows x64
+            - Windows ARM64
+          artifacts: "release_artifacts/**/*" # Use a glob pattern to find all files in the subdirectory
+          token: ${{ secrets.GITHUB_TOKEN }}
