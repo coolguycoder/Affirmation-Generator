@@ -11,7 +11,11 @@ You can either compile the installer manually or use our precompiled binaries.
   3. **Use the app**
 
 ### Install from source
-  1. Build it...
+  1. **Build it**
+     ```bash
+     dotnet build
+     ```
+  2. **Run the exe produced in the installer**
 
 ## FAQs
 <details>
