@@ -15,6 +15,8 @@ jobs:
       uses: actions/setup-dotnet@v5.0.0
     - name: Build artifact
       run: dotnet build Installer-Win.csproj -o AffirmationImageGenerator-x64.exe
+    - name: debug
+      run: ls
     - name: upload artifact
       uses: actions/upload-artifact@v4.6.2
       with:
@@ -29,6 +31,8 @@ jobs:
       uses: actions/setup-dotnet@v5.0.0
     - name: Build artifact
       run: dotnet build Installer-Win.csproj
+    - name: debug
+      run: ls
     - name: upload artifact
       uses: actions/upload-artifact@v4.6.2
       with:
