@@ -25,7 +25,206 @@ namespace AffirmationImageGeneratorNice
         static void Main()
         {
             ApplicationConfiguration.Initialize();
+
+            try
+            {
+                // Check for updates on GitHub Releases before launching the UI.
+                var updater = new Updater("coolguycoder", "Affirmation-Generator");
+                var updateResult = updater.CheckAndPromptForUpdateAsync().GetAwaiter().GetResult();
+                if (updateResult == Updater.UpdateAction.UpdatedAndRelaunched)
+                {
+                    // updater launched the new exe and requested this process to exit
+                    return;
+                }
+            }
+            catch
+            {
+                // Ignore update errors and continue launching the app
+            }
+
             Application.Run(new WizardForm());
+        }
+    }
+
+    // Simple GitHub Releases updater. Performs a version check against the latest release
+    // and prompts the user to download and apply the update. If the user accepts, downloads
+    // the .zip asset, extracts to a temporary folder, and spawns a PowerShell script to replace
+    // the current application folder and launch the new executable.
+    public class Updater
+    {
+        private readonly string owner;
+        private readonly string repo;
+        private const string GitHubApiLatest = "https://api.github.com/repos/{0}/{1}/releases/latest";
+
+        public enum UpdateAction
+        {
+            None,
+            UpdatedAndRelaunched,
+            Skipped
+        }
+
+        public Updater(string owner, string repo)
+        {
+            this.owner = owner;
+            this.repo = repo;
+        }
+
+        public async System.Threading.Tasks.Task<UpdateAction> CheckAndPromptForUpdateAsync()
+        {
+            try
+            {
+                using var http = new System.Net.Http.HttpClient();
+                http.DefaultRequestHeaders.UserAgent.ParseAdd("AffirmationImageGenerator-Updater/1.0");
+                var url = string.Format(GitHubApiLatest, owner, repo);
+                var resp = await http.GetAsync(url).ConfigureAwait(false);
+                if (!resp.IsSuccessStatusCode) return UpdateAction.None;
+
+                var json = await resp.Content.ReadAsStringAsync().ConfigureAwait(false);
+                using var doc = System.Text.Json.JsonDocument.Parse(json);
+                var root = doc.RootElement;
+
+                var latestTag = root.GetProperty("tag_name").GetString() ?? "";
+                if (string.IsNullOrWhiteSpace(latestTag)) return UpdateAction.None;
+
+                // Determine current version from assembly file version or exe last write time
+                var currentVersion = GetCurrentVersionString();
+                if (IsSameVersion(currentVersion, latestTag)) return UpdateAction.None;
+
+                var name = root.GetProperty("name").GetString() ?? latestTag;
+                var body = root.TryGetProperty("body", out var b) ? b.GetString() : null;
+
+                var message = $"A new release is available: {name} ({latestTag}).\nInstalled: {currentVersion}\n\nRelease notes:\n{(body ?? "(no notes)")}";
+
+                var res = MessageBox.Show(message + "\n\nDo you want to download and install the update now?", "Update available", MessageBoxButtons.YesNo, MessageBoxIcon.Information);
+                if (res != DialogResult.Yes) return UpdateAction.Skipped;
+
+                // find first zip asset
+                string? zipUrl = null;
+                if (root.TryGetProperty("assets", out var assets) && assets.ValueKind == System.Text.Json.JsonValueKind.Array)
+                {
+                    foreach (var a in assets.EnumerateArray())
+                    {
+                        if (a.TryGetProperty("browser_download_url", out var d) && a.TryGetProperty("name", out var n))
+                        {
+                            var nameAsset = n.GetString() ?? "";
+                            if (nameAsset.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
+                            {
+                                zipUrl = d.GetString();
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                if (zipUrl == null) MessageBox.Show("No .zip asset found for the latest release.");
+                else
+                {
+                    var tmp = Path.Combine(Path.GetTempPath(), "AffirmationUpdate");
+                    if (Directory.Exists(tmp)) Directory.Delete(tmp, true);
+                    Directory.CreateDirectory(tmp);
+
+                    var zipPath = Path.Combine(tmp, "release.zip");
+                    using (var stream = await http.GetStreamAsync(zipUrl).ConfigureAwait(false))
+                    using (var fs = new FileStream(zipPath, FileMode.Create, FileAccess.Write, FileShare.None))
+                    {
+                        await stream.CopyToAsync(fs).ConfigureAwait(false);
+                    }
+
+                    // extract
+                    var extractPath = Path.Combine(tmp, "extracted");
+                    System.IO.Compression.ZipFile.ExtractToDirectory(zipPath, extractPath);
+
+                    // find the exe inside the extracted folder: choose the first .exe with a matching repo name or any top-level exe
+                    var exe = FindExeInDirectory(extractPath);
+                    if (exe == null)
+                    {
+                        MessageBox.Show("Couldn't find an executable inside the release zip.");
+                        return UpdateAction.None;
+                    }
+
+                    // prepare a small PowerShell script that waits for this process to exit, deletes the current folder, moves new files into place, and launches the exe
+                    var currentDir = AppContext.BaseDirectory.TrimEnd(Path.DirectorySeparatorChar);
+                    var parentDir = currentDir; // we will replace the contents of this folder
+                    var psScript = $@"$curPid = {System.Diagnostics.Process.GetCurrentProcess().Id}
+while (Get-Process -Id $curPid -ErrorAction SilentlyContinue) {{ Start-Sleep -Milliseconds 200 }}
+Start-Sleep -Milliseconds 200
+# remove contents of the current folder (but keep the folder itself)
+Remove-Item -Recurse -Force ""{parentDir}\*""
+Move-Item -Path ""{extractPath}\*"" -Destination ""{parentDir}"" -Force
+Start-Process -FilePath ""{Path.Combine(parentDir, Path.GetFileName(exe))}""
+";
+
+                    var psPath = Path.Combine(tmp, "apply_update.ps1");
+                    File.WriteAllText(psPath, psScript);
+
+                    // launch powershell to apply update after this process exits
+                    var psi = new System.Diagnostics.ProcessStartInfo
+                    {
+                        FileName = "powershell.exe",
+                        Arguments = $"-NoProfile -ExecutionPolicy Bypass -File \"{psPath}\"",
+                        UseShellExecute = false,
+                        CreateNoWindow = true
+                    };
+                    System.Diagnostics.Process.Start(psi);
+
+                    // exit this process so updater can replace files
+                    Application.Exit();
+                    return UpdateAction.UpdatedAndRelaunched;
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Update check failed: " + ex.Message);
+            }
+            return UpdateAction.None;
+        }
+
+        private static string GetCurrentVersionString()
+        {
+            try
+            {
+                var asm = System.Reflection.Assembly.GetEntryAssembly();
+                var ver = asm?.GetName().Version?.ToString();
+                if (!string.IsNullOrWhiteSpace(ver)) return ver!;
+            }
+            catch { }
+            // fallback: exe last write time
+            try
+            {
+                var exe = System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName;
+                if (exe != null && File.Exists(exe))
+                {
+                    var t = File.GetLastWriteTimeUtc(exe);
+                    return t.ToString("yyyyMMddHHmmss");
+                }
+            }
+            catch { }
+            return "0";
+        }
+
+        private static bool IsSameVersion(string current, string latestTag)
+        {
+            if (string.IsNullOrWhiteSpace(current)) return false;
+            // normalize: strip leading 'v' from tag
+            var tag = latestTag.TrimStart('v', 'V');
+            return current.Contains(tag) || tag.Contains(current);
+        }
+
+        private static string? FindExeInDirectory(string path)
+        {
+            try
+            {
+                // first try top-level exe matching repo name
+                var files = Directory.GetFiles(path, "*.exe", SearchOption.AllDirectories);
+                if (files.Length == 0) return null;
+                foreach (var f in files)
+                {
+                    if (Path.GetFileNameWithoutExtension(f).IndexOf("Affirmation", StringComparison.OrdinalIgnoreCase) >= 0)
+                        return f;
+                }
+                return files[0];
+            }
+            catch { return null; }
         }
     }
 

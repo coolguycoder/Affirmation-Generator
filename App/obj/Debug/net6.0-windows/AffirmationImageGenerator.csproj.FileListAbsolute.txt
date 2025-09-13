@@ -1,0 +1,15 @@
+C:\Users\ytsle\Documents\GitHub\Affirmation-Generator\App\bin\Debug\net6.0-windows\AffirmationImageGenerator.exe
+C:\Users\ytsle\Documents\GitHub\Affirmation-Generator\App\bin\Debug\net6.0-windows\AffirmationImageGenerator.deps.json
+C:\Users\ytsle\Documents\GitHub\Affirmation-Generator\App\bin\Debug\net6.0-windows\AffirmationImageGenerator.runtimeconfig.json
+C:\Users\ytsle\Documents\GitHub\Affirmation-Generator\App\bin\Debug\net6.0-windows\AffirmationImageGenerator.dll
+C:\Users\ytsle\Documents\GitHub\Affirmation-Generator\App\bin\Debug\net6.0-windows\AffirmationImageGenerator.pdb
+C:\Users\ytsle\Documents\GitHub\Affirmation-Generator\App\obj\Debug\net6.0-windows\AffirmationImageGenerator.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\ytsle\Documents\GitHub\Affirmation-Generator\App\obj\Debug\net6.0-windows\AffirmationImageGenerator.AssemblyInfoInputs.cache
+C:\Users\ytsle\Documents\GitHub\Affirmation-Generator\App\obj\Debug\net6.0-windows\AffirmationImageGenerator.AssemblyInfo.cs
+C:\Users\ytsle\Documents\GitHub\Affirmation-Generator\App\obj\Debug\net6.0-windows\AffirmationImageGenerator.csproj.CoreCompileInputs.cache
+C:\Users\ytsle\Documents\GitHub\Affirmation-Generator\App\obj\Debug\net6.0-windows\AffirmationImageGenerator.sourcelink.json
+C:\Users\ytsle\Documents\GitHub\Affirmation-Generator\App\obj\Debug\net6.0-windows\AffirmationImageGenerator.dll
+C:\Users\ytsle\Documents\GitHub\Affirmation-Generator\App\obj\Debug\net6.0-windows\refint\AffirmationImageGenerator.dll
+C:\Users\ytsle\Documents\GitHub\Affirmation-Generator\App\obj\Debug\net6.0-windows\AffirmationImageGenerator.pdb
+C:\Users\ytsle\Documents\GitHub\Affirmation-Generator\App\obj\Debug\net6.0-windows\AffirmationImageGenerator.genruntimeconfig.cache
+C:\Users\ytsle\Documents\GitHub\Affirmation-Generator\App\obj\Debug\net6.0-windows\ref\AffirmationImageGenerator.dll
