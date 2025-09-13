@@ -20,4 +20,7 @@ Thanks to google for the font I used for it. Prob dont needa credit but I need s
 Thanks to bluekiwi.lol for helpin me out with like ui changes and stuf.
 
 
+
+
+
 # Make sure to go to gekohosting167.online and bluekiwi.lol!!!
