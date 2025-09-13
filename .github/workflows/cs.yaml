@@ -1,0 +1,88 @@
+name: Build and release C#
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag for the release (e.g. v1.0.0)'
+        required: true
+
+jobs:
+  build-windows-x64:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v5.0.0
+
+      - name: Build x64 executable
+        run: |
+          mkdir output
+          dotnet build "Installer/Installer Win.csproj" -c Release -o output
+          mv output/*.exe output/AffirmationImageGenerator-x64.exe
+
+      - name: Upload x64 artifact
+        uses: actions/upload-artifact@v4.6.2
+        with:
+          name: x64-binary
+          path: output/AffirmationImageGenerator-x64.exe
+
+  build-windows-arm64:
+    runs-on: windows-11-arm
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v5.0.0
+
+      - name: Build ARM64 executable
+        run: |
+          mkdir output
+          dotnet build "Installer/Installer Win.csproj" -c Release -o output
+          mv output/*.exe output/AffirmationImageGenerator-aarch64.exe
+
+      - name: Upload ARM64 artifact
+        uses: actions/upload-artifact@v4.6.2
+        with:
+          name: arm64-binary
+          path: output/AffirmationImageGenerator-aarch64.exe
+
+  release:
+    needs: [build-windows-x64, build-windows-arm64]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download x64 artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: x64-binary
+          path: release_artifacts/x64
+
+      - name: Download ARM64 artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: arm64-binary
+          path: release_artifacts/arm64
+
+      - name: Verify downloaded files
+        run: |
+          ls -R release_artifacts
+
+      - name: Create GitHub release
+        uses: ncipollo/release-action@v1
+        with:
+          tag: ${{ inputs.tag }}
+          name: Release ${{ inputs.tag }}
+          body: |
+            ## Release Notes for ${{ inputs.tag }}
+
+            This release includes the following binaries:
+            - Windows x64
+            - Windows ARM64
+          artifacts: |
+            release_artifacts/x64/AffirmationImageGenerator-x64.exe
+            release_artifacts/arm64/AffirmationImageGenerator-aarch64.exe
+          token: ${{ secrets.GITHUB_TOKEN }}
