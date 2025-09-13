@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk.WindowsDesktop">
+
+  <PropertyGroup>
+    <!-- Change TargetFramework to net6.0-windows if you prefer .NET 6 -->
+    <TargetFramework>net7.0-windows</TargetFramework>
+
+    <!-- Required for Windows Forms apps -->
+    <UseWindowsForms>true</UseWindowsForms>
+
+    <!-- Other niceties -->
+    <OutputType>WinExe</OutputType>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+  </PropertyGroup>
+
+</Project>
