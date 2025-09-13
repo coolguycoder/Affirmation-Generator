@@ -67,9 +67,11 @@ jobs:
           name: Release ${{ inputs.tag }}
           body: |
             ## Release Notes for ${{ inputs.tag }}
-            
+          
             This release includes the following binaries:
             - Windows x64
             - Windows ARM64
-          artifacts: "release_artifacts/**/*"
+          artifacts: |
+            release_artifacts/AffirmationImageGenerator-x64.exe
+            release_artifacts/AffirmationImageGenerator-aarch64.exe
           token: ${{ secrets.GITHUB_TOKEN }}
