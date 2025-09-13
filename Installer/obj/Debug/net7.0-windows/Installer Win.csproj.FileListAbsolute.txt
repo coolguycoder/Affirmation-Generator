@@ -1,0 +1,15 @@
+C:\Users\ytsle\Documents\GitHub\Affirmation-Generator\Installer\bin\Debug\net7.0-windows\Installer Win.exe
+C:\Users\ytsle\Documents\GitHub\Affirmation-Generator\Installer\bin\Debug\net7.0-windows\Installer Win.deps.json
+C:\Users\ytsle\Documents\GitHub\Affirmation-Generator\Installer\bin\Debug\net7.0-windows\Installer Win.runtimeconfig.json
+C:\Users\ytsle\Documents\GitHub\Affirmation-Generator\Installer\bin\Debug\net7.0-windows\Installer Win.dll
+C:\Users\ytsle\Documents\GitHub\Affirmation-Generator\Installer\bin\Debug\net7.0-windows\Installer Win.pdb
+C:\Users\ytsle\Documents\GitHub\Affirmation-Generator\Installer\obj\Debug\net7.0-windows\Installer Win.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\ytsle\Documents\GitHub\Affirmation-Generator\Installer\obj\Debug\net7.0-windows\Installer Win.AssemblyInfoInputs.cache
+C:\Users\ytsle\Documents\GitHub\Affirmation-Generator\Installer\obj\Debug\net7.0-windows\Installer Win.AssemblyInfo.cs
+C:\Users\ytsle\Documents\GitHub\Affirmation-Generator\Installer\obj\Debug\net7.0-windows\Installer Win.csproj.CoreCompileInputs.cache
+C:\Users\ytsle\Documents\GitHub\Affirmation-Generator\Installer\obj\Debug\net7.0-windows\Installer Win.sourcelink.json
+C:\Users\ytsle\Documents\GitHub\Affirmation-Generator\Installer\obj\Debug\net7.0-windows\Installer Win.dll
+C:\Users\ytsle\Documents\GitHub\Affirmation-Generator\Installer\obj\Debug\net7.0-windows\refint\Installer Win.dll
+C:\Users\ytsle\Documents\GitHub\Affirmation-Generator\Installer\obj\Debug\net7.0-windows\Installer Win.pdb
+C:\Users\ytsle\Documents\GitHub\Affirmation-Generator\Installer\obj\Debug\net7.0-windows\Installer Win.genruntimeconfig.cache
+C:\Users\ytsle\Documents\GitHub\Affirmation-Generator\Installer\obj\Debug\net7.0-windows\ref\Installer Win.dll
