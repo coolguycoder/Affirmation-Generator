@@ -19,13 +19,16 @@ jobs:
       - name: Build x64 executable
         run: |
           mkdir output
-          dotnet build "Installer/Installer Win.csproj" -c Release -o output
+          dotnet build "Installer/Installer Win.csproj" -c Release -o output/installer
+          # Build the app project and output next to installer outputs
+          dotnet build "app/app.csproj" -c Release -o output/app
           # If the build produces .bin files, compress them. Otherwise, fall back to any .exe.
           pushd output
-          if (Test-Path -Path "*.bin") {
-            Compress-Archive -Path *.bin -DestinationPath ..\AffirmationImageGenerator-x64.zip -Force
+          # Include both installer and app outputs in the zip
+          if (Test-Path -Path "installer\*.bin" -or Test-Path -Path "app\*.bin") {
+            Compress-Archive -Path installer\*.bin,app\*.bin -DestinationPath ..\AffirmationImageGenerator-x64.zip -Force
           } else {
-            # include exe as well if present
+            # include all produced artifacts (exes, dlls, etc.)
             Compress-Archive -Path * -DestinationPath ..\AffirmationImageGenerator-x64.zip -Force
           }
           popd
@@ -47,11 +50,13 @@ jobs:
       - name: Build ARM64 executable
         run: |
           mkdir output
-          dotnet build "Installer/Installer Win.csproj" -c Release -o output
+          dotnet build "Installer/Installer Win.csproj" -c Release -o output/installer
+          # Build the app project
+          dotnet build "app/app.csproj" -c Release -o output/app
           # Compress .bin files into a zip; if none exist, include produced artifacts
           pushd output
-          if (Test-Path -Path "*.bin") {
-            Compress-Archive -Path *.bin -DestinationPath ..\AffirmationImageGenerator-aarch64.zip -Force
+          if (Test-Path -Path "installer\*.bin" -or Test-Path -Path "app\*.bin") {
+            Compress-Archive -Path installer\*.bin,app\*.bin -DestinationPath ..\AffirmationImageGenerator-aarch64.zip -Force
           } else {
             Compress-Archive -Path * -DestinationPath ..\AffirmationImageGenerator-aarch64.zip -Force
           }
