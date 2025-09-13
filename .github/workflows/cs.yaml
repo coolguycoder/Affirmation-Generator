@@ -1,44 +1,46 @@
-# This workflow will build a c# project
-
 name: C#
 
 on:
   workflow_dispatch:
-  
+    inputs:
+      tag:
+        description: 'Tag for the release (e.g. v1.0.0)'
+        required: true
+
 jobs:
 
   build-windows-x64:
     runs-on: windows-latest
     steps:
-    - uses: actions/checkout@v4
-    - name: Set up C#
-      uses: actions/setup-dotnet@v5.0.0
-    - name: Build artifact
-      run: dotnet build Installer-Win.csproj -o AffirmationImageGenerator-x64.exe
-    - name: debug
-      run: ls
-    - name: upload artifact
-      uses: actions/upload-artifact@v4.6.2
-      with:
-        name: AffirmationImageGenerator-x64.exe
-        path: AffirmationImageGenerator-x64.exe
+      - uses: actions/checkout@v4
+      - name: Set up C#
+        uses: actions/setup-dotnet@v5.0.0
+      - name: Build artifact
+        run: dotnet build Installer-Win.csproj -o AffirmationImageGenerator-x64.exe
+      - name: debug
+        run: ls
+      - name: upload artifact
+        uses: actions/upload-artifact@v4.6.2
+        with:
+          name: AffirmationImageGenerator-x64.exe
+          path: AffirmationImageGenerator-x64.exe
 
   build-windows-arm64:
     runs-on: windows-11-arm
     steps:
-    - uses: actions/checkout@v4
-    - name: Set up C#
-      uses: actions/setup-dotnet@v5.0.0
-    - name: Build artifact
-      run: dotnet build Installer-Win.csproj -o AffirmationImageGenerator-aarch64.exe
-    - name: debug
-      run: ls
-    - name: upload artifact
-      uses: actions/upload-artifact@v4.6.2
-      with:
-        name: AffirmationImageGenerator-aarch64.exe
-        path: AffirmationImageGenerator-aarch64.exe
-        
+      - uses: actions/checkout@v4
+      - name: Set up C#
+        uses: actions/setup-dotnet@v5.0.0
+      - name: Build artifact
+        run: dotnet build Installer-Win.csproj -o AffirmationImageGenerator-aarch64.exe
+      - name: debug
+        run: ls
+      - name: upload artifact
+        uses: actions/upload-artifact@v4.6.2
+        with:
+          name: AffirmationImageGenerator-aarch64.exe
+          path: AffirmationImageGenerator-aarch64.exe
+
   release:
     needs: [build-windows-x64, build-windows-arm64]
     runs-on: ubuntu-latest
@@ -49,16 +51,25 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: release_artifacts
+
+      - name: Debug inputs
+        run: |
+          if [ -z "${{ inputs.tag }}" ]; then
+            echo "No tag input provided!"
+          else
+            echo "Tag is: ${{ inputs.tag }}"
+          fi
+
       - name: Create release
         uses: ncipollo/release-action@v1
         with:
-          tag: ${{ github.ref_name }}
-          name: Release ${{ github.ref_name }}
+          tag: ${{ inputs.tag }}
+          name: Release ${{ inputs.tag }}
           body: |
-            ## Release Notes for ${{ github.ref_name }}
+            ## Release Notes for ${{ inputs.tag }}
             
             This release includes the following binaries:
             - Windows x64
             - Windows ARM64
-          artifacts: "release_artifacts/**/*" # Use a glob pattern to find all files in the subdirectory
+          artifacts: "release_artifacts/**/*"
           token: ${{ secrets.GITHUB_TOKEN }}
