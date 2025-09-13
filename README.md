@@ -21,4 +21,5 @@ You can either compile the installer manually or use our precompiled binaries.
 <details>
 <summary>How do I uninistall this?</summary>
 Simple! You don't...
+  <small>Or you could scout the appdata folder for the installed files and delete it. But who would acually do that...</small>
 </details>
