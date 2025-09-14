@@ -373,7 +373,7 @@ Start-Process -FilePath ""{Path.Combine(parentDir, Path.GetFileName(exe))}""
 
             for (int i = 0; i < 4; i++)
             {
-                var card = CreateStepCard(i + 1, i == 0 ? "Setup" : i == 1 ? "Affirmations" : i == 2 ? "Preview" : "Version");
+                var card = CreateStepCard(i + 1, i == 0 ? "Setup" : i == 1 ? "Affirmations" : i == 2 ? "Preview" : "About");
                 stepPanel.Controls.Add(card);
             }
 
@@ -613,6 +613,23 @@ Start-Process -FilePath ""{Path.Combine(parentDir, Path.GetFileName(exe))}""
                 AutoSize = true
             };
             card.Controls.Add(versionLabel);
+
+            var updateButton = new Button
+            {
+                Text = "Check for Updates",
+                Location = new Point(20, versionLabel.Bottom + 20),
+                AutoSize = true
+            };
+            updateButton.Click += async (s, e) =>
+            {
+                var updater = new Updater("coolguycoder", "Affirmation-Generator");
+                var updateResult = await updater.CheckAndPromptForUpdateAsync();
+                if (updateResult == Updater.UpdateAction.None)
+                {
+                    MessageBox.Show("No updates available.", "Update Check", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
+            };
+            card.Controls.Add(updateButton);
         }
 
         private Panel MakeCard(int x, int y, int w, int h)
@@ -671,10 +688,10 @@ Start-Process -FilePath ""{Path.Combine(parentDir, Path.GetFileName(exe))}""
             btnGenerate.Visible = (stepIndex == steps.Length - 2);
             btnNext.Visible = (stepIndex < steps.Length - 1);
 
-            var headerHint = stepIndex == 0 ? "Step 1 — pick backgrounds & output" :
+                        var headerHint = stepIndex == 0 ? "Step 1 — pick backgrounds & output" :
                              stepIndex == 1 ? "Step 2 — enter your affirmations" :
                              stepIndex == 2 ? "Step 3 — preview and generate" :
-                             "Step 4 — Version Info";
+                             "Step 4 — About";
             titleLabel.Text = "Affirmation Image Maker — " + headerHint;
 
             // show/hide save-setup button
