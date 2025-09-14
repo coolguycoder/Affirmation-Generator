@@ -84,16 +84,46 @@ namespace AffirmationImageGeneratorNice
                 var root = doc.RootElement;
 
                 var latestTag = root.GetProperty("tag_name").GetString() ?? "";
-                if (string.IsNullOrWhiteSpace(latestTag)) return UpdateAction.None;
-
-                // Determine current version from assembly file version or exe last write time
-                var currentVersion = GetCurrentVersionString();
-                if (IsSameVersion(currentVersion, latestTag)) return UpdateAction.None;
-
                 var name = root.GetProperty("name").GetString() ?? latestTag;
                 var body = root.TryGetProperty("body", out var b) ? b.GetString() : null;
 
-                var message = $"A new release is available: {name} ({latestTag}).\nInstalled: {currentVersion}\n\nRelease notes:\n{(body ?? "(no notes)")}";
+                // Prefer comparing release publish timestamp to the local exe write time. This is
+                // more reliable when the assembly version isn't updated between releases.
+                DateTimeOffset? releasePublished = null;
+                if (root.TryGetProperty("published_at", out var pub) && pub.ValueKind == System.Text.Json.JsonValueKind.String)
+                {
+                    var pubStr = pub.GetString();
+                    if (!string.IsNullOrWhiteSpace(pubStr) && DateTimeOffset.TryParse(pubStr, out var dto))
+                        releasePublished = dto.ToUniversalTime();
+                }
+
+                DateTime localExeWriteUtc = DateTime.MinValue;
+                try
+                {
+                    var exePath = System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName;
+                    if (!string.IsNullOrWhiteSpace(exePath) && File.Exists(exePath))
+                        localExeWriteUtc = File.GetLastWriteTimeUtc(exePath);
+                }
+                catch { }
+
+                bool isNewer = false;
+                if (releasePublished.HasValue)
+                {
+                    isNewer = releasePublished.Value.UtcDateTime > localExeWriteUtc;
+                }
+                else
+                {
+                    // fallback to tag comparison if published_at not available
+                    var currentVersion = GetCurrentVersionString();
+                    if (!string.IsNullOrWhiteSpace(latestTag) && !IsSameVersion(currentVersion, latestTag))
+                        isNewer = true;
+                }
+
+                if (!isNewer) return UpdateAction.None;
+
+                // compute a friendly installed version string for the prompt
+                var installedVersion = GetCurrentVersionString();
+                var message = $"A new release is available: {name} ({latestTag}).\nInstalled: {installedVersion}\n\nRelease notes:\n{(body ?? "(no notes)")}";
 
                 var res = MessageBox.Show(message + "\n\nDo you want to download and install the update now?", "Update available", MessageBoxButtons.YesNo, MessageBoxIcon.Information);
                 if (res != DialogResult.Yes) return UpdateAction.Skipped;
