@@ -161,11 +161,11 @@ namespace SimpleInstaller
         GroupBox groupBox;
 
         // Download URL (raw GitHub file you provided)
-        const string DownloadUrl = "https://github.com/coolguycoder/ShmolphMakesSites.github.io/raw/3e09e3bc16c46ae306f681b016e55a8cbb87973d/Main.zip";
+        const string DownloadUrl = "https://github.com/coolguycoder/Affirmation-Generator/releases/latest/download/app-x64.zip";
 
         // Quick scan config
         const int SystemScanTimeoutMs = 8000; // time budget to find existing installation (ms)
-        readonly string[] FilenameTokensToFind = new[] { "shmolph", "shmolphmakessites", "mydownloadedapp", "main" };
+        readonly string[] FilenameTokensToFind = new[] { "Affirmation", "AffirmationImageGenerator" };
 
         public InstallerForm()
         {
@@ -184,7 +184,7 @@ namespace SimpleInstaller
 
             lblTitle = new Label
             {
-                Text = "MyDownloadedApp Installer",
+                Text = "Affirmation Generator Installer",
                 Left = 12,
                 Top = 10,
                 Width = ClientSize.Width - 24,
@@ -251,7 +251,7 @@ namespace SimpleInstaller
             groupBox.Controls.Add(btnForceInstall);
 
             // default install path (LocalAppData avoids elevation issues)
-            txtPath.Text = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "MyDownloadedApp");
+            txtPath.Text = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "AffirmationGenerator");
         }
 
         private void BtnBrowse_Click(object sender, EventArgs e)
@@ -319,7 +319,7 @@ namespace SimpleInstaller
                 if (!forceInstall)
                 {
                     // If any exe already exists inside chosen folder, just launch and close
-                    var existingExeInside = Directory.GetFiles(installPath, "*.exe", SearchOption.AllDirectories).FirstOrDefault();
+                    var existingExeInside = Directory.GetFiles(installPath, "AffirmationImageGenerator.exe", SearchOption.AllDirectories).FirstOrDefault();
                     if (!string.IsNullOrEmpty(existingExeInside))
                     {
                         UpdateActionSafe("Detected application in chosen folder");
@@ -334,7 +334,7 @@ namespace SimpleInstaller
                 string tempFolder = Path.Combine(Path.GetTempPath(), "SimpleInstaller");
                 Directory.CreateDirectory(tempFolder);
 
-                string zipPath = Path.Combine(tempFolder, "Main.zip");
+                string zipPath = Path.Combine(tempFolder, "app-x64.zip");
 
                 UpdateActionSafe("Downloading package...");
                 UpdateStatusSafe("Starting download");
@@ -367,7 +367,7 @@ namespace SimpleInstaller
                 try { File.Delete(zipPath); } catch { /* ignore */ }
 
                 // 4) Find exe and act
-                var exe = Directory.GetFiles(installPath, "*.exe", SearchOption.AllDirectories).FirstOrDefault();
+                var exe = Directory.GetFiles(installPath, "AffirmationImageGenerator.exe", SearchOption.AllDirectories).FirstOrDefault();
                 if (exe == null)
                 {
                     UpdateActionSafe("Installed (no exe found)");
