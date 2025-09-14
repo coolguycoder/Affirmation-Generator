@@ -26,6 +26,7 @@ jobs:
           pushd app
           dotnet build -c Release -r win-x64
           popd
+          Copy-Item "App/LilitaOne-Regular.ttf" -Destination "app/bin"
           Compress-Archive -Path app/bin -DestinationPath app-x64.zip -Force
 
       - name: Upload x64 installer artifact
