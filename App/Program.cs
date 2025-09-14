@@ -26,22 +26,6 @@ namespace AffirmationImageGeneratorNice
         {
             ApplicationConfiguration.Initialize();
 
-            try
-            {
-                // Check for updates on GitHub Releases before launching the UI.
-                var updater = new Updater("coolguycoder", "Affirmation-Generator");
-                var updateResult = updater.CheckAndPromptForUpdateAsync().GetAwaiter().GetResult();
-                if (updateResult == Updater.UpdateAction.UpdatedAndRelaunched)
-                {
-                    // updater launched the new exe and requested this process to exit
-                    return;
-                }
-            }
-            catch
-            {
-                // Ignore update errors and continue launching the app
-            }
-
             Application.Run(new WizardForm());
         }
     }
@@ -175,13 +159,12 @@ namespace AffirmationImageGeneratorNice
                     // prepare a small PowerShell script that waits for this process to exit, deletes the current folder, moves new files into place, and launches the exe
                     var currentDir = AppContext.BaseDirectory.TrimEnd(Path.DirectorySeparatorChar);
                     var parentDir = currentDir; // we will replace the contents of this folder
-                    var psScript = $@"$curPid = {System.Diagnostics.Process.GetCurrentProcess().Id}
+                    var psScript = $"`$curPid = {System.Diagnostics.Process.GetCurrentProcess().Id}
 while (Get-Process -Id $curPid -ErrorAction SilentlyContinue) {{ Start-Sleep -Milliseconds 200 }}
 Start-Sleep -Milliseconds 200
 # remove contents of the current folder (but keep the folder itself)
-Remove-Item -Recurse -Force ""{parentDir}\*""
-Move-Item -Path ""{extractPath}\*"" -Destination ""{parentDir}"" -Force
-Start-Process -FilePath ""{Path.Combine(parentDir, Path.GetFileName(exe))}""
+Remove-Item -Recurse -Force \"{parentDir}\\*\"`nMove-Item -Path \"{extractPath}\\*\" -Destination \"{parentDir}\" -Force
+Start-Process -FilePath \"{Path.Combine(parentDir, Path.GetFileName(exe))}\" 
 ";
 
                     var psPath = Path.Combine(tmp, "apply_update.ps1");
@@ -266,7 +249,7 @@ Start-Process -FilePath ""{Path.Combine(parentDir, Path.GetFileName(exe))}""
         private FlowLayoutPanel stepPanel = new FlowLayoutPanel();
 
         // wizard panels
-        private Panel[] steps = new Panel[3];
+        private Panel[] steps = new Panel[4];
         private int stepIndex = 0;
 
         // step 1 controls (setup)
@@ -688,10 +671,10 @@ Start-Process -FilePath ""{Path.Combine(parentDir, Path.GetFileName(exe))}""
             btnGenerate.Visible = (stepIndex == steps.Length - 2);
             btnNext.Visible = (stepIndex < steps.Length - 1);
 
-                        var headerHint = stepIndex == 0 ? "Step 1 — pick backgrounds & output" :
+            var headerHint = stepIndex == 0 ? "Step 1 — pick backgrounds & output" :
                              stepIndex == 1 ? "Step 2 — enter your affirmations" :
                              stepIndex == 2 ? "Step 3 — preview and generate" :
-                             "Step 4 — About";
+                             "About";
             titleLabel.Text = "Affirmation Image Maker — " + headerHint;
 
             // show/hide save-setup button
@@ -1147,7 +1130,7 @@ Start-Process -FilePath ""{Path.Combine(parentDir, Path.GetFileName(exe))}""
         {
             public static string? ShowDialog(string text, string caption, string value = "")
             {
-                Form prompt = new Form()
+                Form prompt = new Form() 
                 {
                     Width = 600, Height = 180, Text = caption, StartPosition = FormStartPosition.CenterParent
                 };
