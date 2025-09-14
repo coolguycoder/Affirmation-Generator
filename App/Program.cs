@@ -371,9 +371,9 @@ Start-Process -FilePath ""{Path.Combine(parentDir, Path.GetFileName(exe))}""
             stepPanel.AutoSize = false;
             headerPanel.Controls.Add(stepPanel);
 
-            for (int i = 0; i < 3; i++)
+            for (int i = 0; i < 4; i++)
             {
-                var card = CreateStepCard(i + 1, i == 0 ? "Setup" : i == 1 ? "Affirmations" : "Preview");
+                var card = CreateStepCard(i + 1, i == 0 ? "Setup" : i == 1 ? "Affirmations" : i == 2 ? "Preview" : "Version");
                 stepPanel.Controls.Add(card);
             }
 
@@ -436,7 +436,7 @@ Start-Process -FilePath ""{Path.Combine(parentDir, Path.GetFileName(exe))}""
 
         private void BuildSteps()
         {
-            steps = new Panel[3];
+            steps = new Panel[4];
             int top = headerPanel.Bottom + 12;
             int left = 20;
             int stepW = ClientSize.Width - 40;
@@ -456,6 +456,11 @@ Start-Process -FilePath ""{Path.Combine(parentDir, Path.GetFileName(exe))}""
             BuildStep3(p3);
             Controls.Add(p3);
             steps[2] = p3;
+
+            var p4 = new Panel { Left = left, Top = top, Width = stepW, Height = stepH, BackColor = Color.Transparent };
+            BuildStep4(p4);
+            Controls.Add(p4);
+            steps[3] = p4;
         }
 
         private void BuildStep1(Panel pane)
@@ -594,6 +599,22 @@ Start-Process -FilePath ""{Path.Combine(parentDir, Path.GetFileName(exe))}""
             card.Controls.AddRange(new Control[] { previewBox, btnPreview, btnGenerate });
         }
 
+        private void BuildStep4(Panel pane)
+        {
+            var card = MakeCard(20, 20, 640, 480);
+            pane.Controls.Add(card);
+
+            var versionLabel = new Label
+            {
+                Text = $"Version: {System.Reflection.Assembly.GetEntryAssembly()?.GetName().Version}",
+                Font = new Font("Segoe UI Semibold", 14f),
+                ForeColor = Color.FromArgb(35, 47, 63),
+                Location = new Point(20, 20),
+                AutoSize = true
+            };
+            card.Controls.Add(versionLabel);
+        }
+
         private Panel MakeCard(int x, int y, int w, int h)
         {
             var p = new Panel
@@ -647,12 +668,13 @@ Start-Process -FilePath ""{Path.Combine(parentDir, Path.GetFileName(exe))}""
 
             btnBack.Enabled = stepIndex > 0;
             btnNext.Enabled = stepIndex < steps.Length - 1;
-            btnGenerate.Visible = (stepIndex == steps.Length - 1);
+            btnGenerate.Visible = (stepIndex == steps.Length - 2);
             btnNext.Visible = (stepIndex < steps.Length - 1);
 
             var headerHint = stepIndex == 0 ? "Step 1 — pick backgrounds & output" :
                              stepIndex == 1 ? "Step 2 — enter your affirmations" :
-                             "Step 3 — preview and generate";
+                             stepIndex == 2 ? "Step 3 — preview and generate" :
+                             "Step 4 — Version Info";
             titleLabel.Text = "Affirmation Image Maker — " + headerHint;
 
             // show/hide save-setup button
