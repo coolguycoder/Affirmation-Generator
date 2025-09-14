@@ -16,15 +16,21 @@ jobs:
       - name: Set up .NET
         uses: actions/setup-dotnet@v5.0.0
 
+      - name: Set cleaned version
+        shell: powershell
+        run: |
+          $cleanedVersion = "${{ inputs.tag }}".Replace("v", "")
+          echo "VERSION_CLEANED=$cleanedVersion" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8
+
       - name: Build and package x64
         run: |
           # Build and package installer
-          dotnet publish "Installer/Installer Win.csproj" -c Release -r win-x64 --self-contained true -o output/installer /p:Version=${{ inputs.tag }}
+          dotnet publish "Installer/Installer Win.csproj" -c Release -r win-x64 --self-contained true -o output/installer /p:Version=${{ env.VERSION_CLEANED }}
           Compress-Archive -Path output/installer -DestinationPath installer-x64.zip -Force
 
           # Build and package app
           pushd app
-          dotnet build -c Release -r win-x64 /p:Version=${{ inputs.tag }}
+          dotnet build -c Release -r win-x64 /p:Version=${{ env.VERSION_CLEANED }}
           popd
           Copy-Item "App/LilitaOne-Regular.ttf" -Destination "app/bin"
           Compress-Archive -Path app/bin -DestinationPath app-x64.zip -Force
@@ -49,17 +55,23 @@ jobs:
       - name: Set up .NET
         uses: actions/setup-dotnet@v5.0.0
 
+      - name: Set cleaned version
+        shell: powershell
+        run: |
+          $cleanedVersion = "${{ inputs.tag }}".Replace("v", "")
+          echo "VERSION_CLEANED=$cleanedVersion" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8
+
       - name: Build and package ARM64
         run: |
           # Build and package installer
-          dotnet publish "Installer/Installer Win.csproj" -c Release -r win-arm64 --self-contained true -o output/installer /p:Version=${{ inputs.tag }}
+          dotnet publish "Installer/Installer Win.csproj" -c Release -r win-arm64 --self-contained true -o output/installer /p:Version=${{ env.VERSION_CLEANED }}
           Compress-Archive -Path output/installer -DestinationPath installer-arm64.zip -Force
 
           # Build and package app
           pushd app
-          dotnet build -c Release -r win-arm64 /p:Version=${{ inputs.tag }}
+          dotnet build -c Release -r win-arm64 /p:Version=${{ env.VERSION_CLEANED }}
           popd
-          Copy-Item "App/LilitaOne-Regular.ttf" -Destination "app/bin/Release/net6.0-windows/win-arm64"
+          Copy-Item "App/LilitaOne-Regular.ttf" -Destination "app/bin/Release/net8.0-windows/win-arm64"
           Compress-Archive -Path app/bin -DestinationPath app-arm64.zip -Force
 
       - name: Upload ARM64 installer artifact
