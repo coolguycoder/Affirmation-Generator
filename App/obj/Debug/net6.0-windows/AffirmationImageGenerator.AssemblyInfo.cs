@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("AffirmationImageGenerator")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+ebc2e9207996820184ed4b932894ec73b0277f08")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+fe1f6b1aa754db04f5a2da92588f6baa60443cf6")]
 [assembly: System.Reflection.AssemblyProductAttribute("AffirmationImageGenerator")]
 [assembly: System.Reflection.AssemblyTitleAttribute("AffirmationImageGenerator")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
