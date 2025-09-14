@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("Installer Win")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+e802e00184af85521048c62e749b14c1bf657a00")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+1422ee88eb37998dbc87c4187a1cff146a03bbae")]
 [assembly: System.Reflection.AssemblyProductAttribute("Installer Win")]
 [assembly: System.Reflection.AssemblyTitleAttribute("Installer Win")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
