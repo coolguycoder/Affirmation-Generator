@@ -126,6 +126,7 @@ jobs:
         with:
           tag: ${{ inputs.tag }}
           name: Release ${{ inputs.tag }}
+          generateReleaseNotes: true
           body: |
             ## Release Notes for ${{ inputs.tag }}
 
