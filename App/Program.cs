@@ -160,12 +160,12 @@ namespace AffirmationImageGeneratorNice
                     var currentDir = AppContext.BaseDirectory.TrimEnd(Path.DirectorySeparatorChar);
                     var parentDir = currentDir; // we will replace the contents of this folder
                     var psScript = $@"$curPid = {System.Diagnostics.Process.GetCurrentProcess().Id};
-while (Get-Process -Id $curPid -ErrorAction SilentlyContinue) {{ Start-Sleep -Milliseconds 200 }};
-Start-Sleep -Milliseconds 200;
+while (Get-Process -Id $curPid -ErrorAction SilentlyContinue) {{ Start-Sleep -Milliseconds 200 }}
+Start-Sleep -Milliseconds 200
 # remove contents of the current folder (but keep the folder itself)
-Remove-Item -Recurse -Force \"{parentDir}\\\*\";
-Move-Item -Path \"{extractPath}\\\*\" -Destination \"{parentDir}\" -Force;
-Start-Process -FilePath \"{Path.Combine(parentDir, Path.GetFileName(exe))}\";
+Remove-Item -Recurse -Force ""{parentDir}\\*""
+Move-Item -Path ""{extractPath}\\*"" -Destination ""{parentDir}"" -Force
+Start-Process -FilePath ""{Path.Combine(parentDir, Path.GetFileName(exe))}""
 ";
 
                     var psPath = Path.Combine(tmp, "apply_update.ps1");
@@ -175,7 +175,7 @@ Start-Process -FilePath \"{Path.Combine(parentDir, Path.GetFileName(exe))}\";
                     var psi = new System.Diagnostics.ProcessStartInfo
                     {
                         FileName = "powershell.exe",
-                        Arguments = $'-NoProfile -ExecutionPolicy Bypass -File \"{psPath}\" ',
+                        Arguments = $"-NoProfile -ExecutionPolicy Bypass -File \"{psPath}\" ",
                         UseShellExecute = false,
                         CreateNoWindow = true
                     };
