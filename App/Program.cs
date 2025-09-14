@@ -244,6 +244,24 @@ Start-Process -FilePath ""{Path.Combine(parentDir, Path.GetFileName(exe))}""
 
     public class WizardForm : Form
     {
+        private class Options
+        {
+            public string FontFile = "";
+            public float FontSize = 56f;
+            public Color Color = Color.White;
+            public int X = 30;
+            public int Y = 0;
+            public int Width = 0;
+            public int Height = 0;
+            public bool RandomBase = true;
+            public string Prefix = "affirmation_";
+        }
+
+        //
+        // menu controls
+        private MenuStrip mainMenu;
+        private ToolStripMenuItem versionMenuItem;
+        private ToolStripMenuItem checkUpdateMenuItem;
         // header / stepper
         private Panel headerPanel = new Panel();
         private Label titleLabel = new Label();
@@ -299,6 +317,16 @@ Start-Process -FilePath ""{Path.Combine(parentDir, Path.GetFileName(exe))}""
 
         public WizardForm()
         {
+            // Initialize menu controls
+            mainMenu = new MenuStrip();
+            versionMenuItem = new ToolStripMenuItem($"Version: {Updater.GetCurrentVersionString()}");
+            checkUpdateMenuItem = new ToolStripMenuItem("Check for Updates");
+            checkUpdateMenuItem.Click += async (s, e) => await CheckForUpdatesAsync();
+            mainMenu.Items.Add(versionMenuItem);
+            mainMenu.Items.Add(checkUpdateMenuItem);
+            Controls.Add(mainMenu);
+            MainMenuStrip = mainMenu;
+
             Text = "Affirmation Image Maker";
             Width = 1100;
             Height = 760;
@@ -1131,7 +1159,7 @@ Start-Process -FilePath ""{Path.Combine(parentDir, Path.GetFileName(exe))}""
         {
             public static string? ShowDialog(string text, string caption, string value = "")
             {
-                Form prompt = new Form() 
+                Form prompt = new Form()
                 {
                     Width = 600, Height = 180, Text = caption, StartPosition = FormStartPosition.CenterParent
                 };
@@ -1144,19 +1172,6 @@ Start-Process -FilePath ""{Path.Combine(parentDir, Path.GetFileName(exe))}""
                 prompt.Controls.AddRange(new Control[] { textLabel, txt, ok, cancel });
                 return prompt.ShowDialog() == DialogResult.OK ? txt.Text : null;
             }
-        }
-
-        private class Options
-        {
-            public string FontFile = "";
-            public float FontSize = 56f;
-            public Color Color = Color.White;
-            public int X = 30;
-            public int Y = 0;
-            public int Width = 0;
-            public int Height = 0;
-            public bool RandomBase = true;
-            public string Prefix = "affirmation_";
         }
     }
 }
