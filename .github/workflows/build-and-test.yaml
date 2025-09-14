@@ -1,0 +1,34 @@
+name: Build and Test
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '8.x'
+
+    - name: Restore dependencies
+      run: |
+        dotnet restore "App/AffirmationImageGenerator.csproj"
+        dotnet restore "Installer/Installer Win.csproj"
+
+    - name: Build
+      run: |
+        dotnet build "App/AffirmationImageGenerator.csproj" --no-restore
+        dotnet build "Installer/Installer Win.csproj" --no-restore
+
+    - name: Test
+      run: |
+        dotnet test "App/AffirmationImageGenerator.csproj" --no-build --verbosity normal
+        dotnet test "Installer/Installer Win.csproj" --no-build --verbosity normal
