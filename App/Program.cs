@@ -355,6 +355,17 @@ Start-Process -FilePath ""{Path.Combine(parentDir, Path.GetFileName(exe))}""
             this.FormClosing += WizardForm_FormClosing;
         }
 
+        // Fix for missing CheckForUpdatesAsync method
+        private async System.Threading.Tasks.Task CheckForUpdatesAsync()
+        {
+            var updater = new Updater("coolguycoder", "Affirmation-Generator");
+            var updateResult = await updater.CheckAndPromptForUpdateAsync();
+            if (updateResult == Updater.UpdateAction.None)
+            {
+                MessageBox.Show("No updates available.", "Update Check", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+        }
+
         private void BuildHeader()
         {
             headerPanel.SetBounds(0, 0, ClientSize.Width, 120);
