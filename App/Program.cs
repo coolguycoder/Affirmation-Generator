@@ -71,37 +71,29 @@ namespace AffirmationImageGeneratorNice
                 var name = root.GetProperty("name").GetString() ?? latestTag;
                 var body = root.TryGetProperty("body", out var b) ? b.GetString() : null;
 
-                // Prefer comparing release publish timestamp to the local exe write time. This is
-                // more reliable when the assembly version isn't updated between releases.
-                DateTimeOffset? releasePublished = null;
-                if (root.TryGetProperty("published_at", out var pub) && pub.ValueKind == System.Text.Json.JsonValueKind.String)
-                {
-                    var pubStr = pub.GetString();
-                    if (!string.IsNullOrWhiteSpace(pubStr) && DateTimeOffset.TryParse(pubStr, out var dto))
-                        releasePublished = dto.ToUniversalTime();
-                }
 
-                DateTime localExeWriteUtc = DateTime.MinValue;
-                try
-                {
-                    var exePath = System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName;
-                    if (!string.IsNullOrWhiteSpace(exePath) && File.Exists(exePath))
-                        localExeWriteUtc = File.GetLastWriteTimeUtc(exePath);
-                }
-                catch { }
-
-                bool isNewer = false;
-                if (releasePublished.HasValue)
-                {
-                    isNewer = releasePublished.Value.UtcDateTime > localExeWriteUtc;
-                }
-                else
-                {
-                    // fallback to tag comparison if published_at not available
-                    var currentVersion = GetCurrentVersionString();
-                    if (!string.IsNullOrWhiteSpace(latestTag) && !IsSameVersion(currentVersion, latestTag))
-                        isNewer = true;
-                }
+                // Always compare release tag to app version string
+                var currentVersion = GetCurrentVersionString();
+                bool isNewer = !string.IsNullOrWhiteSpace(latestTag) && !IsSameVersion(currentVersion, latestTag);
+                // Optionally, also check published date if you want to support timestamp-based updates
+                // (uncomment below if you want both checks)
+                // DateTimeOffset? releasePublished = null;
+                // if (root.TryGetProperty("published_at", out var pub) && pub.ValueKind == System.Text.Json.JsonValueKind.String)
+                // {
+                //     var pubStr = pub.GetString();
+                //     if (!string.IsNullOrWhiteSpace(pubStr) && DateTimeOffset.TryParse(pubStr, out var dto))
+                //         releasePublished = dto.ToUniversalTime();
+                // }
+                // DateTime localExeWriteUtc = DateTime.MinValue;
+                // try
+                // {
+                //     var exePath = System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName;
+                //     if (!string.IsNullOrWhiteSpace(exePath) && File.Exists(exePath))
+                //         localExeWriteUtc = File.GetLastWriteTimeUtc(exePath);
+                // }
+                // catch { }
+                // if (releasePublished.HasValue && releasePublished.Value.UtcDateTime > localExeWriteUtc)
+                //     isNewer = true;
 
                 if (!isNewer) return UpdateAction.None;
 
