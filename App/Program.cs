@@ -315,21 +315,26 @@ namespace AffirmationImageGeneratorNice
         this.FormBorderStyle = FormBorderStyle.FixedSingle;
         this.MaximizeBox = false;
 
-        BuildHeader();
-        BuildSteps();
-        BuildNavigation();
-        WireKeys();
+    BuildHeader();
+    BuildSteps();
+    BuildNavigation();
+    WireKeys();
 
-        // load saved settings if present (auto-apply to controls, but do NOT change starting page)
-        LoadSettingsIfExists();
+    // Always bring header and navigation to front
+    headerPanel.BringToFront();
+    btnBack.BringToFront();
+    btnNext.BringToFront();
 
-        // populate base images list immediately (so preview works right away if a base/folder is already set)
-        PopulateBaseList();
+    // load saved settings if present (auto-apply to controls, but do NOT change starting page)
+    LoadSettingsIfExists();
 
-        // ensure we start on setup page so user sees Step 1 on load
-        stepIndex = 0;
-        UpdateStep();
-        this.FormClosing += WizardForm_FormClosing;
+    // populate base images list immediately (so preview works right away if a base/folder is already set)
+    PopulateBaseList();
+
+    // ensure we start on setup page so user sees Step 1 on load
+    stepIndex = 0;
+    UpdateStep();
+    this.FormClosing += WizardForm_FormClosing;
     }
 
     // Event handler for form closing
@@ -490,7 +495,9 @@ namespace AffirmationImageGeneratorNice
             int top = 18;
             int labelW = 140;
             int ctrlW = 420;
+            int spacing = 36;
 
+            // Base image controls
             var lBase = new Label { Text = "Base image or folder:", Left = left, Top = top, Width = labelW };
             basePathBox.SetBounds(left + labelW, top - 2, ctrlW - 110, 28);
             btnChooseBase.Text = "Browse";
@@ -500,9 +507,44 @@ namespace AffirmationImageGeneratorNice
             chkRandomBase.SetBounds(btnChooseBase.Left, btnChooseBase.Bottom + 8, 140, 22);
             chkRandomBase.Checked = true;
 
-        // ...existing code...
+            // Output folder controls
+            var outTop = chkRandomBase.Bottom + spacing;
+            lOut.Text = "Output folder:";
+            lOut.SetBounds(left, outTop, labelW, 28);
+            outputFolderBox.SetBounds(left + labelW, outTop, ctrlW - 110, 28);
+            btnChooseOutput.Text = "Browse";
+            btnChooseOutput.SetBounds(outputFolderBox.Right + 8, outTop, 90, 28);
+            btnChooseOutput.Click += BtnChooseOutput_Click;
 
-            baseCountLabel.SetBounds(12, baseImagesList.Top - 24, 200, 24);
+            // Font controls
+            var fontTop = outputFolderBox.Bottom + spacing;
+            lFont.Text = "Font file:";
+            lFont.SetBounds(left, fontTop, labelW, 28);
+            fontPathBox.SetBounds(left + labelW, fontTop, ctrlW - 110, 28);
+            btnChooseFont.Text = "Browse";
+            btnChooseFont.SetBounds(fontPathBox.Right + 8, fontTop, 90, 28);
+            btnChooseFont.Click += BtnChooseFont_Click;
+
+            lSize.Text = "Font size:";
+            lSize.SetBounds(left, fontPathBox.Bottom + 8, labelW, 28);
+            fontSizeUp.SetBounds(left + labelW, fontPathBox.Bottom + 8, 80, 28);
+            fontSizeUp.Minimum = 10;
+            fontSizeUp.Maximum = 120;
+            fontSizeUp.Value = 56;
+
+            // Color controls
+            var colorTop = fontSizeUp.Bottom + spacing;
+            lColor.Text = "Text color:";
+            lColor.SetBounds(left, colorTop, labelW, 28);
+            btnChooseColor.Text = "Choose";
+            btnChooseColor.SetBounds(left + labelW, colorTop, 90, 28);
+            btnChooseColor.Click += BtnChooseColor_Click;
+            colorPreview.SetBounds(btnChooseColor.Right + 8, colorTop, 40, 28);
+            colorPreview.BackColor = chosenColor;
+
+            // Base images list
+            baseImagesList.SetBounds(left, btnChooseColor.Bottom + spacing, 320, 120);
+            baseCountLabel.SetBounds(left, baseImagesList.Bottom + 8, 200, 24);
             baseCountLabel.Text = "No images selected";
 
             card.Controls.AddRange(new Control[] {
@@ -655,7 +697,14 @@ namespace AffirmationImageGeneratorNice
 
         private void UpdateStep()
         {
-            for (int i = 0; i < steps.Length; i++) steps[i].Visible = (i == stepIndex);
+            for (int i = 0; i < steps.Length; i++)
+            {
+                steps[i].Visible = (i == stepIndex);
+                if (steps[i].Visible) steps[i].BringToFront();
+            }
+            // Always bring mainMenu and headerPanel to front
+            if (mainMenu != null) mainMenu.BringToFront();
+            if (headerPanel != null) headerPanel.BringToFront();
 
             foreach (Control c in stepPanel.Controls)
             {
