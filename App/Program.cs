@@ -17,6 +17,7 @@ namespace AffirmationImageGeneratorNice
         public decimal FontSize { get; set; }
         public int TextColor { get; set; }
         public bool RandomBase { get; set; }
+        public bool ProcessAllImages { get; set; }
     }
 
     static class Program
@@ -225,6 +226,7 @@ namespace AffirmationImageGeneratorNice
         public int Width = 0;
         public int Height = 0;
         public bool RandomBase = true;
+        public bool ProcessAllImages = false;
         public string Prefix = "affirmation_";
     }
 
@@ -280,6 +282,7 @@ namespace AffirmationImageGeneratorNice
     // settings
     private readonly string settingsPath = Path.Combine(AppContext.BaseDirectory, "affirmation_settings.json");
     private bool setupMode = false;
+    private bool processAllImages = false;
 
     public WizardForm()
     {
@@ -342,7 +345,7 @@ namespace AffirmationImageGeneratorNice
             var version = Updater.GetCurrentVersionString();
             var credits = "Affirmation Generator\nBy coolguycoder\nGitHub: github.com/coolguycoder/Affirmation-Generator";
 
-            var aboutForm = new Form()
+            var aboutForm = new Form() 
             {
                 Text = "About Affirmation Generator",
                 Width = 420,
@@ -353,7 +356,7 @@ namespace AffirmationImageGeneratorNice
                 MinimizeBox = false
             };
 
-            var lblTitle = new Label()
+            var lblTitle = new Label() 
             {
                 Text = "Affirmation Generator",
                 Font = new Font("Segoe UI Semibold", 16f),
@@ -362,7 +365,7 @@ namespace AffirmationImageGeneratorNice
             };
             aboutForm.Controls.Add(lblTitle);
 
-            var lblVersion = new Label()
+            var lblVersion = new Label() 
             {
                 Text = $"Version: {version}",
                 Font = new Font("Segoe UI", 11f),
@@ -371,7 +374,7 @@ namespace AffirmationImageGeneratorNice
             };
             aboutForm.Controls.Add(lblVersion);
 
-            var lblCredits = new Label()
+            var lblCredits = new Label() 
             {
                 Text = "By coolguycoder\nGitHub: github.com/coolguycoder/Affirmation-Generator",
                 Font = new Font("Segoe UI", 10f),
@@ -380,7 +383,7 @@ namespace AffirmationImageGeneratorNice
             };
             aboutForm.Controls.Add(lblCredits);
 
-            var btnUpdate = new Button()
+            var btnUpdate = new Button() 
             {
                 Text = "Check for Updates",
                 Width = 140,
@@ -402,7 +405,7 @@ namespace AffirmationImageGeneratorNice
             };
             aboutForm.Controls.Add(btnUpdate);
 
-            var btnOK = new Button()
+            var btnOK = new Button() 
             {
                 Text = "OK",
                 Width = 80,
@@ -567,12 +570,9 @@ namespace AffirmationImageGeneratorNice
             btnChooseBase.Text = "Browse";
             btnChooseBase.SetBounds(basePathBox.Right + 8, top - 2, 90, 28);
             btnChooseBase.Click += BtnChooseBase_Click;
-            chkRandomBase.Text = "Random if folder";
-            chkRandomBase.SetBounds(btnChooseBase.Left, btnChooseBase.Bottom + 8, 140, 22);
-            chkRandomBase.Checked = true;
 
             // Output folder controls
-            var outTop = chkRandomBase.Bottom + spacing;
+            var outTop = btnChooseBase.Bottom + spacing;
             lOut.Text = "Output folder:";
             lOut.SetBounds(left, outTop, labelW, 28);
             outputFolderBox.SetBounds(left + labelW, outTop, ctrlW - 110, 28);
@@ -612,7 +612,7 @@ namespace AffirmationImageGeneratorNice
             baseCountLabel.Text = "No images selected";
 
             card.Controls.AddRange(new Control[] {
-                lBase, basePathBox, btnChooseBase, chkRandomBase,
+                lBase, basePathBox, btnChooseBase,
                 lOut, outputFolderBox, btnChooseOutput,
                 lFont, fontPathBox, btnChooseFont, lSize, fontSizeUp,
                 lColor, btnChooseColor, colorPreview,
@@ -831,10 +831,38 @@ namespace AffirmationImageGeneratorNice
                 e.Handled = true;
             }
 
+            // Ctrl+D to open settings
+            if (e.Control && e.KeyCode == Keys.D)
+            {
+                ShowSettingsDialog();
+                e.Handled = true;
+            }
+
+            // Ctrl+S to open snake game
+            if (e.Control && e.KeyCode == Keys.S)
+            {
+                var snakeForm = new SnakeForm();
+                snakeForm.ShowDialog(this);
+                e.Handled = true;
+            }
+
             // quick preview: press P when on step 3
             if (e.KeyCode == Keys.P && stepIndex == 2)
             {
                 BtnPreview_Click(this, EventArgs.Empty);
+            }
+        }
+
+        private void ShowSettingsDialog()
+        {
+            using (var settingsForm = new SettingsForm(chkRandomBase.Checked, processAllImages))
+            {
+                if (settingsForm.ShowDialog(this) == DialogResult.OK)
+                {
+                    chkRandomBase.Checked = settingsForm.chkRandomBase.Checked;
+                    processAllImages = settingsForm.chkProcessAllImages.Checked;
+                    SaveSettings();
+                }
             }
         }
 
@@ -857,7 +885,8 @@ namespace AffirmationImageGeneratorNice
                 FontPath = string.IsNullOrWhiteSpace(fontPathBox.Text) ? null : fontPathBox.Text,
                 FontSize = fontSizeUp.Value,
                 TextColor = chosenColor.ToArgb(),
-                RandomBase = chkRandomBase.Checked
+                RandomBase = chkRandomBase.Checked,
+                ProcessAllImages = processAllImages
             };
             try
             {
@@ -893,6 +922,7 @@ namespace AffirmationImageGeneratorNice
                 chosenColor = Color.FromArgb(s.TextColor);
                 colorPreview.BackColor = chosenColor;
                 chkRandomBase.Checked = s.RandomBase;
+                processAllImages = s.ProcessAllImages;
 
                 // NOTE: do NOT change stepIndex here — leave UI on setup so user sees it on load
             }
@@ -936,7 +966,7 @@ namespace AffirmationImageGeneratorNice
         {
             baseImagesList.Items.Clear();
             var path = basePathBox.Text?.Trim();
-            if (string.IsNullOrWhiteSpace(path))
+            if (string.IsNullOrWhiteSpace(path)) 
             {
                 baseCountLabel.Text = "No images selected";
                 return;
@@ -1093,36 +1123,68 @@ namespace AffirmationImageGeneratorNice
 
             var opts = GetOptions();
             var rnd = new Random();
-            using var prog = new ProgressForm(lstAffirmations.Items.Count);
+            var totalImages = processAllImages ? lstAffirmations.Items.Count * baseList.Count : lstAffirmations.Items.Count;
+            using var prog = new ProgressForm(totalImages);
             prog.Show(this);
 
-            for (int i = 0; i < lstAffirmations.Items.Count; i++)
+            if (processAllImages)
             {
-                Application.DoEvents();
-                var text = lstAffirmations.Items[i].ToString() ?? "";
-
-                // if user selected specific base in list, use that for all; otherwise random or first
-                string baseFile;
-                if (baseImagesList.SelectedIndex >= 0)
-                    baseFile = baseImagesList.SelectedItem?.ToString() ?? baseList[0];
-                else if (baseList.Count == 1 || !opts.RandomBase)
-                    baseFile = baseList[0];
-                else
-                    baseFile = baseList[rnd.Next(baseList.Count)];
-
-                try
+                int imageCounter = 0;
+                for (int i = 0; i < lstAffirmations.Items.Count; i++)
                 {
-                    using var src = (Bitmap)Image.FromFile(baseFile);
-                    using var bmp = RenderAffirmationToBitmap(src, text, opts, 0, 0);
-                    var filename = $"{opts.Prefix}{i + 1:000}.png";
-                    var outPath = Path.Combine(outDir, filename);
-                    bmp.Save(outPath, ImageFormat.Png);
+                    for (int j = 0; j < baseList.Count; j++)
+                    {
+                        Application.DoEvents();
+                        var text = lstAffirmations.Items[i].ToString() ?? "";
+                        string baseFile = baseList[j];
+
+                        try
+                        {
+                            using var src = (Bitmap)Image.FromFile(baseFile);
+                            using var bmp = RenderAffirmationToBitmap(src, text, opts, 0, 0);
+                            var filename = $"{opts.Prefix}{imageCounter + 1:000}.png";
+                            var outPath = Path.Combine(outDir, filename);
+                            bmp.Save(outPath, ImageFormat.Png);
+                        }
+                        catch (Exception ex)
+                        {
+                            MessageBox.Show($"Failed on item {i + 1}: {ex.Message}");
+                        }
+                        prog.Increment();
+                        imageCounter++;
+                    }
                 }
-                catch (Exception ex)
+            }
+            else
+            {
+                for (int i = 0; i < lstAffirmations.Items.Count; i++)
                 {
-                    MessageBox.Show($"Failed on item {i + 1}: {ex.Message}");
+                    Application.DoEvents();
+                    var text = lstAffirmations.Items[i].ToString() ?? "";
+
+                    // if user selected specific base in list, use that for all; otherwise random or first
+                    string baseFile;
+                    if (baseImagesList.SelectedIndex >= 0)
+                        baseFile = baseImagesList.SelectedItem?.ToString() ?? baseList[0];
+                    else if (baseList.Count == 1 || !opts.RandomBase)
+                        baseFile = baseList[0];
+                    else
+                        baseFile = baseList[rnd.Next(baseList.Count)];
+
+                    try
+                    {
+                        using var src = (Bitmap)Image.FromFile(baseFile);
+                        using var bmp = RenderAffirmationToBitmap(src, text, opts, 0, 0);
+                        var filename = $"{opts.Prefix}{i + 1:000}.png";
+                        var outPath = Path.Combine(outDir, filename);
+                        bmp.Save(outPath, ImageFormat.Png);
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show($"Failed on item {i + 1}: {ex.Message}");
+                    }
+                    prog.Increment();
                 }
-                prog.Increment();
             }
             prog.Close();
             MessageBox.Show("Done. Check the output folder.");
@@ -1154,6 +1216,7 @@ namespace AffirmationImageGeneratorNice
                 Width = 0,
                 Height = 0,
                 RandomBase = chkRandomBase.Checked,
+                ProcessAllImages = processAllImages,
                 Prefix = "affirmation_"
             };
         }
@@ -1244,5 +1307,3 @@ namespace AffirmationImageGeneratorNice
         }
     }
 }
-
-        
