@@ -282,6 +282,8 @@ Start-Process -FilePath ""{Path.Combine(parentDir, Path.GetFileName(exe))}""
         private Button btnChooseFont = new Button();
         private NumericUpDown fontSizeUp = new NumericUpDown();
         private Button btnChooseColor = new Button();
+                // Run update check on startup
+                this.Load += async (s, e) => await CheckForUpdatesAsync();
         private Panel colorPreview = new Panel();
         private CheckBox chkRandomBase = new CheckBox();
 
@@ -330,15 +332,15 @@ Start-Process -FilePath ""{Path.Combine(parentDir, Path.GetFileName(exe))}""
             Controls.Add(mainMenu);
             MainMenuStrip = mainMenu;
 
-            Text = "Affirmation Image Maker";
-            Width = 1100;
-            Height = 760;
-            KeyPreview = true;
-            StartPosition = FormStartPosition.CenterScreen;
-            BackColor = Color.FromArgb(245, 247, 250);
-            Font = new Font("Segoe UI", 10);
-            FormBorderStyle = FormBorderStyle.FixedSingle;
-            MaximizeBox = false;
+            this.Text = "Affirmation Image Maker";
+            this.Width = 1100;
+            this.Height = 760;
+            this.KeyPreview = true;
+            this.StartPosition = FormStartPosition.CenterScreen;
+            this.BackColor = Color.FromArgb(245, 247, 250);
+            this.Font = new Font("Segoe UI", 10);
+            this.FormBorderStyle = FormBorderStyle.FixedSingle;
+            this.MaximizeBox = false;
 
             BuildHeader();
             BuildSteps();
