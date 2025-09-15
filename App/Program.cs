@@ -144,33 +144,43 @@ namespace AffirmationImageGeneratorNice
                         await stream.CopyToAsync(fs).ConfigureAwait(false);
                     }
 
-                    // extract
-                    var extractPath = Path.Combine(tmp, "extracted");
-                    System.IO.Compression.ZipFile.ExtractToDirectory(zipPath, extractPath);
-
-                    // find the exe inside the extracted folder: choose the first .exe with a matching repo name or any top-level exe
-                    var exe = FindExeInDirectory(extractPath);
-                    if (exe == null)
+            else
+            {
+                try
+                {
+                    var currentDir = AppContext.BaseDirectory.TrimEnd(Path.DirectorySeparatorChar);
+                    var zipPath = Path.Combine(currentDir, "update_release.zip");
+                    using (var stream = await http.GetStreamAsync(zipUrl).ConfigureAwait(false))
                     {
-                        MessageBox.Show("Couldn't find an executable inside the release zip.");
-                        return UpdateAction.None;
+                        using (var fs = new FileStream(zipPath, FileMode.Create, FileAccess.Write, FileShare.None))
+                        {
+                            await stream.CopyToAsync(fs).ConfigureAwait(false);
+                        }
                     }
 
-                    // prepare a small PowerShell script that waits for this process to exit, deletes the current folder, moves new files into place, and launches the exe
-                    var currentDir = AppContext.BaseDirectory.TrimEnd(Path.DirectorySeparatorChar);
-                    var parentDir = currentDir; // we will replace the contents of this folder
-                    var psScript = $@"$curPid = {System.Diagnostics.Process.GetCurrentProcess().Id};
-while (Get-Process -Id $curPid -ErrorAction SilentlyContinue) {{ Start-Sleep -Milliseconds 200 }}
-Start-Sleep -Milliseconds 200
-# remove contents of the current folder (but keep the folder itself)
-Remove-Item -Recurse -Force ""{parentDir}\\*""
-Move-Item -Path ""{extractPath}\\*"" -Destination ""{parentDir}"" -Force
-Start-Process -FilePath ""{Path.Combine(parentDir, Path.GetFileName(exe))}""
-";
+                    // Extract zip directly into current app folder, overwrite files
+                    System.IO.Compression.ZipFile.ExtractToDirectory(zipPath, currentDir, true);
+                    try { File.Delete(zipPath); } catch { }
 
-                    var psPath = Path.Combine(tmp, "apply_update.ps1");
-                    File.WriteAllText(psPath, psScript);
+                    // Relaunch the app
+                    var exePath = System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName;
+                    var psi = new System.Diagnostics.ProcessStartInfo
+                    {
+                        FileName = exePath,
+                        WorkingDirectory = currentDir,
+                        UseShellExecute = true
+                    };
+                    System.Diagnostics.Process.Start(psi);
 
+                    Application.Exit();
+                    return UpdateAction.UpdatedAndRelaunched;
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show("Update failed: " + ex.Message);
+                    return UpdateAction.None;
+                }
+            }
                     // launch powershell to apply update after this process exits
                     var psi = new System.Diagnostics.ProcessStartInfo
                     {
@@ -250,57 +260,31 @@ Start-Process -FilePath ""{Path.Combine(parentDir, Path.GetFileName(exe))}""
             public float FontSize = 56f;
             public Color Color = Color.White;
             public int X = 30;
-            public int Y = 0;
-            public int Width = 0;
-            public int Height = 0;
-            public bool RandomBase = true;
-            public string Prefix = "affirmation_";
-        }
+                {
+                    var currentDir = AppContext.BaseDirectory.TrimEnd(Path.DirectorySeparatorChar);
+                    var zipPath = Path.Combine(currentDir, "update_release.zip");
+                    using (var stream = await http.GetStreamAsync(zipUrl).ConfigureAwait(false))
+                    using (var fs = new FileStream(zipPath, FileMode.Create, FileAccess.Write, FileShare.None))
+                    {
+                        await stream.CopyToAsync(fs).ConfigureAwait(false);
+                    }
 
-        //
-        // menu controls
-        private MenuStrip mainMenu;
-        private ToolStripMenuItem versionMenuItem;
-        private ToolStripMenuItem checkUpdateMenuItem;
-        // header / stepper
-        private Panel headerPanel = new Panel();
-        private Label titleLabel = new Label();
-        private FlowLayoutPanel stepPanel = new FlowLayoutPanel();
+                    // Extract zip directly into current app folder, overwrite files
+                    System.IO.Compression.ZipFile.ExtractToDirectory(zipPath, currentDir, true);
+                    try { File.Delete(zipPath); } catch { }
 
-        // wizard panels
-        private Panel[] steps = new Panel[4];
-        private int stepIndex = 0;
+                    // Relaunch the app
+                    var exePath = System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName;
+                    var psi = new System.Diagnostics.ProcessStartInfo
+                    {
+                        FileName = exePath,
+                        WorkingDirectory = currentDir,
+                        UseShellExecute = true
+                    };
+                    System.Diagnostics.Process.Start(psi);
 
-        // step 1 controls (setup)
-        private TextBox basePathBox = new TextBox();
-        private Button btnChooseBase = new Button();
-        private ListBox baseImagesList = new ListBox();
-        private Label baseCountLabel = new Label();
-        private TextBox outputFolderBox = new TextBox();
-        private Button btnChooseOutput = new Button();
-        private TextBox fontPathBox = new TextBox();
-        private Button btnChooseFont = new Button();
-        private NumericUpDown fontSizeUp = new NumericUpDown();
-        private Button btnChooseColor = new Button();
-                // Run update check on startup
-                this.Load += async (s, e) => await CheckForUpdatesAsync();
-        private Panel colorPreview = new Panel();
-        private CheckBox chkRandomBase = new CheckBox();
-
-        // step 2 controls (affirmations)
-        private ListBox lstAffirmations = new ListBox();
-        private TextBox txtNewAffirmation = new TextBox();
-        private Button btnAddAff = new Button();
-        private Button btnRemoveAff = new Button();
-        private Button btnLoadList = new Button();
-        private Button btnSaveList = new Button();
-
-        // step 3 controls (preview & generate)
-        private PictureBox previewBox = new PictureBox();
-        private Button btnPreview = new Button();
-        private Button btnGenerate = new Button();
-
-        // navigation
+                    Application.Exit();
+                    return UpdateAction.UpdatedAndRelaunched;
         private Button btnBack = new Button();
         private Button btnNext = new Button();
 
@@ -545,38 +529,7 @@ Start-Process -FilePath ""{Path.Combine(parentDir, Path.GetFileName(exe))}""
             chkRandomBase.SetBounds(btnChooseBase.Left, btnChooseBase.Bottom + 8, 140, 22);
             chkRandomBase.Checked = true;
 
-            top += 54;
-            var lOut = new Label { Text = "Output folder:", Left = left, Top = top, Width = labelW };
-            outputFolderBox.SetBounds(left + labelW, top - 2, ctrlW - 110, 28);
-            btnChooseOutput.Text = "Browse";
-            btnChooseOutput.SetBounds(outputFolderBox.Right + 8, top - 2, 90, 28);
-            btnChooseOutput.Click += BtnChooseOutput_Click;
-
-            top += 54;
-            var lFont = new Label { Text = "Font (.ttf) (optional):", Left = left, Top = top, Width = labelW };
-            fontPathBox.SetBounds(left + labelW, top - 2, ctrlW - 220, 28);
-            btnChooseFont.Text = "Choose";
-            btnChooseFont.SetBounds(fontPathBox.Right + 8, top - 2, 90, 28);
-            btnChooseFont.Click += BtnChooseFont_Click;
-            var lSize = new Label { Text = "Size:", Left = btnChooseFont.Right + 8, Top = top, Width = 40 };
-            fontSizeUp.SetBounds(lSize.Right + 4, top - 2, 80, 28);
-            fontSizeUp.Minimum = 16;
-            fontSizeUp.Maximum = 240;
-            fontSizeUp.Value = 56;
-
-            top += 54;
-            var lColor = new Label { Text = "Text color:", Left = left, Top = top, Width = labelW };
-            btnChooseColor.Text = "Pick";
-            btnChooseColor.SetBounds(left + labelW, top - 2, 84, 28);
-            btnChooseColor.Click += BtnChooseColor_Click;
-            colorPreview.SetBounds(btnChooseColor.Right + 10, top - 2, 60, 28);
-            colorPreview.BackColor = chosenColor;
-            colorPreview.BorderStyle = BorderStyle.FixedSingle;
-
-            // base images list + count
-            baseImagesList.SetBounds(12, card.Height - 240, card.Width - 24, 200);
-            baseImagesList.Font = new Font("Segoe UI", 9);
-            baseImagesList.SelectedIndexChanged += BaseImagesList_SelectedIndexChanged;
+        // ...existing code...
 
             baseCountLabel.SetBounds(12, baseImagesList.Top - 24, 200, 24);
             baseCountLabel.Text = "No images selected";
