@@ -17,6 +17,7 @@ namespace AffirmationImageGeneratorNice
         public decimal FontSize { get; set; }
         public int TextColor { get; set; }
         public bool RandomBase { get; set; }
+    }
 
     static class Program
     {
@@ -26,6 +27,7 @@ namespace AffirmationImageGeneratorNice
             ApplicationConfiguration.Initialize();
 
             Application.Run(new WizardForm());
+        }
     }
 
     // Simple GitHub Releases updater. Performs a version check against the latest release
@@ -53,125 +55,124 @@ namespace AffirmationImageGeneratorNice
 
         public async System.Threading.Tasks.Task<UpdateAction> CheckAndPromptForUpdateAsync()
         {
+            try
+            {
+                using var http = new System.Net.Http.HttpClient();
+                http.DefaultRequestHeaders.UserAgent.ParseAdd("AffirmationImageGenerator-Updater/1.0");
+                var url = string.Format(GitHubApiLatest, owner, repo);
+                var resp = await http.GetAsync(url).ConfigureAwait(false);
+                if (!resp.IsSuccessStatusCode) return UpdateAction.None;
+
+                var json = await resp.Content.ReadAsStringAsync().ConfigureAwait(false);
+                using var doc = System.Text.Json.JsonDocument.Parse(json);
+                var root = doc.RootElement;
+
+                var latestTag = root.GetProperty("tag_name").GetString() ?? "";
+                var name = root.GetProperty("name").GetString() ?? latestTag;
+                var body = root.TryGetProperty("body", out var b) ? b.GetString() : null;
+
+                // Prefer comparing release publish timestamp to the local exe write time. This is
+                // more reliable when the assembly version isn't updated between releases.
+                DateTimeOffset? releasePublished = null;
+                if (root.TryGetProperty("published_at", out var pub) && pub.ValueKind == System.Text.Json.JsonValueKind.String)
+                {
+                    var pubStr = pub.GetString();
+                    if (!string.IsNullOrWhiteSpace(pubStr) && DateTimeOffset.TryParse(pubStr, out var dto))
+                        releasePublished = dto.ToUniversalTime();
+                }
+
+                DateTime localExeWriteUtc = DateTime.MinValue;
+                try
+                {
+                    var exePath = System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName;
+                    if (!string.IsNullOrWhiteSpace(exePath) && File.Exists(exePath))
+                        localExeWriteUtc = File.GetLastWriteTimeUtc(exePath);
+                }
+                catch { }
+
+                bool isNewer = false;
+                if (releasePublished.HasValue)
+                {
+                    isNewer = releasePublished.Value.UtcDateTime > localExeWriteUtc;
+                }
+                else
+                {
+                    // fallback to tag comparison if published_at not available
+                    var currentVersion = GetCurrentVersionString();
+                    if (!string.IsNullOrWhiteSpace(latestTag) && !IsSameVersion(currentVersion, latestTag))
+                        isNewer = true;
+                }
+
+                if (!isNewer) return UpdateAction.None;
+
+                // compute a friendly installed version string for the prompt
+                var installedVersion = GetCurrentVersionString();
+                var message = $"A new release is available: {name} ({latestTag}).\nInstalled: {installedVersion}\n\nRelease notes:\n{(body ?? "(no notes)")}";
+
+                var res = MessageBox.Show(message + "\n\nDo you want to download and install the update now?", "Update available", MessageBoxButtons.YesNo, MessageBoxIcon.Information);
+                if (res != DialogResult.Yes) return UpdateAction.Skipped;
+
+                // find first zip asset
+                string? zipUrl = null;
+                if (root.TryGetProperty("assets", out var assets) && assets.ValueKind == System.Text.Json.JsonValueKind.Array)
+                {
+                    foreach (var a in assets.EnumerateArray())
+                    {
+                        if (a.TryGetProperty("browser_download_url", out var d) && a.TryGetProperty("name", out var n))
+                        {
+                            var nameAsset = n.GetString() ?? "";
+                            if (nameAsset.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
+                            {
+                                zipUrl = d.GetString();
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                if (zipUrl == null) MessageBox.Show("No .zip asset found for the latest release.");
+                else
+                {
                     try
                     {
-                        using var http = new System.Net.Http.HttpClient();
-                        http.DefaultRequestHeaders.UserAgent.ParseAdd("AffirmationImageGenerator-Updater/1.0");
-                        var url = string.Format(GitHubApiLatest, owner, repo);
-                        var resp = await http.GetAsync(url).ConfigureAwait(false);
-                        if (!resp.IsSuccessStatusCode) return UpdateAction.None;
+                        var currentDir = AppContext.BaseDirectory.TrimEnd(Path.DirectorySeparatorChar);
+                        var zipPath = Path.Combine(currentDir, "update_release.zip");
+                        var stream = await http.GetStreamAsync(zipUrl).ConfigureAwait(false);
+                        var fs = new FileStream(zipPath, FileMode.Create, FileAccess.Write, FileShare.None);
+                        await stream.CopyToAsync(fs).ConfigureAwait(false);
+                        fs.Close();
+                        stream.Dispose();
 
-                        var json = await resp.Content.ReadAsStringAsync().ConfigureAwait(false);
-                        using var doc = System.Text.Json.JsonDocument.Parse(json);
-                        var root = doc.RootElement;
+                        // Extract zip directly into current app folder, overwrite files
+                        System.IO.Compression.ZipFile.ExtractToDirectory(zipPath, currentDir, true);
+                        try { File.Delete(zipPath); } catch { }
 
-                        var latestTag = root.GetProperty("tag_name").GetString() ?? "";
-                        var name = root.GetProperty("name").GetString() ?? latestTag;
-                        var body = root.TryGetProperty("body", out var b) ? b.GetString() : null;
-
-                        // Prefer comparing release publish timestamp to the local exe write time. This is
-                        // more reliable when the assembly version isn't updated between releases.
-                        DateTimeOffset? releasePublished = null;
-                        if (root.TryGetProperty("published_at", out var pub) && pub.ValueKind == System.Text.Json.JsonValueKind.String)
+                        // Relaunch the app
+                        var exePath = System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName;
+                        var psi = new System.Diagnostics.ProcessStartInfo
                         {
-                            var pubStr = pub.GetString();
-                            if (!string.IsNullOrWhiteSpace(pubStr) && DateTimeOffset.TryParse(pubStr, out var dto))
-                                releasePublished = dto.ToUniversalTime();
-                        }
+                            FileName = exePath,
+                            WorkingDirectory = currentDir,
+                            UseShellExecute = true
+                        };
+                        System.Diagnostics.Process.Start(psi);
 
-                        DateTime localExeWriteUtc = DateTime.MinValue;
-                        try
-                        {
-                            var exePath = System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName;
-                            if (!string.IsNullOrWhiteSpace(exePath) && File.Exists(exePath))
-                                localExeWriteUtc = File.GetLastWriteTimeUtc(exePath);
-                        }
-                        catch { }
-
-                        bool isNewer = false;
-                        if (releasePublished.HasValue)
-                        {
-                            isNewer = releasePublished.Value.UtcDateTime > localExeWriteUtc;
-                        }
-                        else
-                        {
-                            // fallback to tag comparison if published_at not available
-                            var currentVersion = GetCurrentVersionString();
-                            if (!string.IsNullOrWhiteSpace(latestTag) && !IsSameVersion(currentVersion, latestTag))
-                                isNewer = true;
-                        }
-
-                        if (!isNewer) return UpdateAction.None;
-
-                        // compute a friendly installed version string for the prompt
-                        var installedVersion = GetCurrentVersionString();
-                        var message = $"A new release is available: {name} ({latestTag}).\nInstalled: {installedVersion}\n\nRelease notes:\n{(body ?? "(no notes)")}";
-
-                        var res = MessageBox.Show(message + "\n\nDo you want to download and install the update now?", "Update available", MessageBoxButtons.YesNo, MessageBoxIcon.Information);
-                        if (res != DialogResult.Yes) return UpdateAction.Skipped;
-
-                        // find first zip asset
-                        string? zipUrl = null;
-                        if (root.TryGetProperty("assets", out var assets) && assets.ValueKind == System.Text.Json.JsonValueKind.Array)
-                        {
-                            foreach (var a in assets.EnumerateArray())
-                            {
-                                if (a.TryGetProperty("browser_download_url", out var d) && a.TryGetProperty("name", out var n))
-                                {
-                                    var nameAsset = n.GetString() ?? "";
-                                    if (nameAsset.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
-                                    {
-                                        zipUrl = d.GetString();
-                                        break;
-                                    }
-                                }
-                            }
-                        }
-
-                        if (zipUrl == null) MessageBox.Show("No .zip asset found for the latest release.");
-                        else
-                        {
-                            try
-                            {
-                                var currentDir = AppContext.BaseDirectory.TrimEnd(Path.DirectorySeparatorChar);
-                                var zipPath = Path.Combine(currentDir, "update_release.zip");
-                                var stream = await http.GetStreamAsync(zipUrl).ConfigureAwait(false);
-                                var fs = new FileStream(zipPath, FileMode.Create, FileAccess.Write, FileShare.None);
-                                await stream.CopyToAsync(fs).ConfigureAwait(false);
-                                fs.Close();
-                                stream.Dispose();
-
-                                // Extract zip directly into current app folder, overwrite files
-                                System.IO.Compression.ZipFile.ExtractToDirectory(zipPath, currentDir, true);
-                                try { File.Delete(zipPath); } catch { }
-
-                                // Relaunch the app
-                                var exePath = System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName;
-                                var psi = new System.Diagnostics.ProcessStartInfo
-                                {
-                                    FileName = exePath,
-                                    WorkingDirectory = currentDir,
-                                    UseShellExecute = true
-                                };
-                                System.Diagnostics.Process.Start(psi);
-
-                                Application.Exit();
-                                return UpdateAction.UpdatedAndRelaunched;
-                            }
-                            catch (Exception ex)
-                            {
-                                MessageBox.Show("Update failed: " + ex.Message);
-                                return UpdateAction.None;
-                            }
-                        }
+                        Application.Exit();
+                        return UpdateAction.UpdatedAndRelaunched;
                     }
                     catch (Exception ex)
                     {
-                        MessageBox.Show("Update check failed: " + ex.Message);
+                        MessageBox.Show("Update failed: " + ex.Message);
+                        return UpdateAction.None;
                     }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Update check failed: " + ex.Message);
+            }
             return UpdateAction.None;
         }
-    }
 
     public static string GetCurrentVersionString()
         {
@@ -220,6 +221,20 @@ namespace AffirmationImageGeneratorNice
             }
             catch { return null; }
         }
+    }
+
+    public class Options
+    {
+        public string FontFile = "";
+        public float FontSize = 56f;
+        public Color Color = Color.White;
+        public int X = 30;
+        public int Y = 0;
+        public int Width = 0;
+        public int Height = 0;
+        public bool RandomBase = true;
+        public string Prefix = "affirmation_";
+    }
 
     public class WizardForm : Form
     {
@@ -254,18 +269,6 @@ namespace AffirmationImageGeneratorNice
     private Button btnPreview = new Button();
     private Button btnGenerate = new Button();
     // ...existing navigation, setup, font, color, settings fields already present...
-    private class Options
-    {
-        public string FontFile = "";
-        public float FontSize = 56f;
-        public Color Color = Color.White;
-        public int X = 30;
-        public int Y = 0;
-        public int Width = 0;
-        public int Height = 0;
-        public bool RandomBase = true;
-        public string Prefix = "affirmation_";
-    }
     private Button btnBack = new Button();
     private Button btnNext = new Button();
 
@@ -343,8 +346,6 @@ namespace AffirmationImageGeneratorNice
             // ...existing code...
 
             // Duplicate constructor code removed; all initialization is inside the WizardForm constructor above.
-    }
-
         // Fix for missing CheckForUpdatesAsync method
         private async System.Threading.Tasks.Task CheckForUpdatesAsync()
         {
@@ -510,7 +511,6 @@ namespace AffirmationImageGeneratorNice
             // auto-populate when basePathBox changes by leaving focus
             basePathBox.Leave += (s, e) => PopulateBaseList();
         }
-    }
 
         private void BuildStep2(Panel pane)
         {
@@ -1111,7 +1111,7 @@ namespace AffirmationImageGeneratorNice
             }
             return bmp;
         }
+    }
+}
 
-    // end of WizardForm class
-    }
-    }
+        
