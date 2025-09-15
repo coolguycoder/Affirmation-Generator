@@ -701,13 +701,7 @@ namespace AffirmationImageGeneratorNice
             }
         }
 
-        private void WizardForm_FormClosing(object? sender, FormClosingEventArgs e)
-        {
-            if (setupMode)
-            {
-                SaveSettings();
-            }
-    }
+        
 
         private void EnterSetupMode()
         {
