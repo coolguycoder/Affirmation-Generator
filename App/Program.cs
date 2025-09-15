@@ -698,6 +698,14 @@ namespace AffirmationImageGeneratorNice
                 EnterSetupMode();
                 e.Handled = true;
             }
+
+            // Ctrl+A to open About window
+            if (e.Control && e.KeyCode == Keys.A)
+            {
+                ShowAboutDialog();
+                e.Handled = true;
+            }
+
             // quick preview: press P when on step 3
             if (e.KeyCode == Keys.P && stepIndex == 2)
             {
