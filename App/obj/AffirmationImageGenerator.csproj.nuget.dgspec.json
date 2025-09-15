@@ -1,31 +1,30 @@
 {
   "format": 1,
   "restore": {
-    "C:\\Users\\ytsle\\Documents\\GitHub\\Affirmation-Generator\\App\\AffirmationImageGenerator.csproj": {}
+    "C:\\Users\\Marcus\\Documents\\Coding\\Affirmation-Generator\\App\\AffirmationImageGenerator.csproj": {}
   },
   "projects": {
-    "C:\\Users\\ytsle\\Documents\\GitHub\\Affirmation-Generator\\App\\AffirmationImageGenerator.csproj": {
+    "C:\\Users\\Marcus\\Documents\\Coding\\Affirmation-Generator\\App\\AffirmationImageGenerator.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "C:\\Users\\ytsle\\Documents\\GitHub\\Affirmation-Generator\\App\\AffirmationImageGenerator.csproj",
+        "projectUniqueName": "C:\\Users\\Marcus\\Documents\\Coding\\Affirmation-Generator\\App\\AffirmationImageGenerator.csproj",
         "projectName": "AffirmationImageGenerator",
-        "projectPath": "C:\\Users\\ytsle\\Documents\\GitHub\\Affirmation-Generator\\App\\AffirmationImageGenerator.csproj",
-        "packagesPath": "C:\\Users\\ytsle\\.nuget\\packages\\",
-        "outputPath": "C:\\Users\\ytsle\\Documents\\GitHub\\Affirmation-Generator\\App\\obj\\",
+        "projectPath": "C:\\Users\\Marcus\\Documents\\Coding\\Affirmation-Generator\\App\\AffirmationImageGenerator.csproj",
+        "packagesPath": "C:\\Users\\Marcus\\.nuget\\packages\\",
+        "outputPath": "C:\\Users\\Marcus\\Documents\\Coding\\Affirmation-Generator\\App\\obj\\",
         "projectStyle": "PackageReference",
         "configFilePaths": [
-          "C:\\Users\\ytsle\\AppData\\Roaming\\NuGet\\NuGet.Config"
+          "C:\\Users\\Marcus\\AppData\\Roaming\\NuGet\\NuGet.Config"
         ],
         "originalTargetFrameworks": [
-          "net6.0-windows"
+          "net8.0-windows"
         ],
         "sources": {
-          "C:\\Program Files\\dotnet\\library-packs": {},
           "https://api.nuget.org/v3/index.json": {}
         },
         "frameworks": {
-          "net6.0-windows7.0": {
-            "targetAlias": "net6.0-windows",
+          "net8.0-windows7.0": {
+            "targetAlias": "net8.0-windows",
             "projectReferences": {}
           }
         },
@@ -39,11 +38,11 @@
           "auditLevel": "low",
           "auditMode": "direct"
         },
-        "SdkAnalysisLevel": "9.0.300"
+        "SdkAnalysisLevel": "10.0.100"
       },
       "frameworks": {
-        "net6.0-windows7.0": {
-          "targetAlias": "net6.0-windows",
+        "net8.0-windows7.0": {
+          "targetAlias": "net8.0-windows",
           "dependencies": {
             "System.Drawing.Common": {
               "target": "Package",
@@ -64,19 +63,19 @@
           "downloadDependencies": [
             {
               "name": "Microsoft.AspNetCore.App.Ref",
-              "version": "[6.0.36, 6.0.36]"
+              "version": "[8.0.20, 8.0.20]"
             },
             {
               "name": "Microsoft.NETCore.App.Host.win-x64",
-              "version": "[6.0.36, 6.0.36]"
+              "version": "[8.0.20, 8.0.20]"
             },
             {
               "name": "Microsoft.NETCore.App.Ref",
-              "version": "[6.0.36, 6.0.36]"
+              "version": "[8.0.20, 8.0.20]"
             },
             {
               "name": "Microsoft.WindowsDesktop.App.Ref",
-              "version": "[6.0.36, 6.0.36]"
+              "version": "[8.0.20, 8.0.20]"
             }
           ],
           "frameworkReferences": {
@@ -87,7 +86,7 @@
               "privateAssets": "none"
             }
           },
-          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\9.0.303\\RuntimeIdentifierGraph.json"
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.100-rc.1.25451.107/PortableRuntimeIdentifierGraph.json"
         }
       }
     }

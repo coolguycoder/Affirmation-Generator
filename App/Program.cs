@@ -251,6 +251,10 @@ namespace AffirmationImageGeneratorNice
     private Button btnChooseBase = new Button();
     private ListBox baseImagesList = new ListBox();
     private Label baseCountLabel = new Label();
+    private Label lOut = new Label();
+    private Label lFont = new Label();
+    private Label lSize = new Label();
+    private Label lColor = new Label();
     private TextBox outputFolderBox = new TextBox();
     private Button btnChooseOutput = new Button();
     private TextBox fontPathBox = new TextBox();
@@ -328,7 +332,7 @@ namespace AffirmationImageGeneratorNice
     }
 
     // Event handler for form closing
-    private void WizardForm_FormClosing(object sender, FormClosingEventArgs e)
+    private void WizardForm_FormClosing(object? sender, FormClosingEventArgs e)
     {
         if (setupMode)
         {
