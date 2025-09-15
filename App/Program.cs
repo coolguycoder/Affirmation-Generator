@@ -17,7 +17,6 @@ namespace AffirmationImageGeneratorNice
         public decimal FontSize { get; set; }
         public int TextColor { get; set; }
         public bool RandomBase { get; set; }
-    }
 
     static class Program
     {
@@ -27,7 +26,6 @@ namespace AffirmationImageGeneratorNice
             ApplicationConfiguration.Initialize();
 
             Application.Run(new WizardForm());
-        }
     }
 
     // Simple GitHub Releases updater. Performs a version check against the latest release
@@ -55,153 +53,125 @@ namespace AffirmationImageGeneratorNice
 
         public async System.Threading.Tasks.Task<UpdateAction> CheckAndPromptForUpdateAsync()
         {
-            try
-            {
-                using var http = new System.Net.Http.HttpClient();
-                http.DefaultRequestHeaders.UserAgent.ParseAdd("AffirmationImageGenerator-Updater/1.0");
-                var url = string.Format(GitHubApiLatest, owner, repo);
-                var resp = await http.GetAsync(url).ConfigureAwait(false);
-                if (!resp.IsSuccessStatusCode) return UpdateAction.None;
-
-                var json = await resp.Content.ReadAsStringAsync().ConfigureAwait(false);
-                using var doc = System.Text.Json.JsonDocument.Parse(json);
-                var root = doc.RootElement;
-
-                var latestTag = root.GetProperty("tag_name").GetString() ?? "";
-                var name = root.GetProperty("name").GetString() ?? latestTag;
-                var body = root.TryGetProperty("body", out var b) ? b.GetString() : null;
-
-                // Prefer comparing release publish timestamp to the local exe write time. This is
-                // more reliable when the assembly version isn't updated between releases.
-                DateTimeOffset? releasePublished = null;
-                if (root.TryGetProperty("published_at", out var pub) && pub.ValueKind == System.Text.Json.JsonValueKind.String)
-                {
-                    var pubStr = pub.GetString();
-                    if (!string.IsNullOrWhiteSpace(pubStr) && DateTimeOffset.TryParse(pubStr, out var dto))
-                        releasePublished = dto.ToUniversalTime();
-                }
-
-                DateTime localExeWriteUtc = DateTime.MinValue;
-                try
-                {
-                    var exePath = System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName;
-                    if (!string.IsNullOrWhiteSpace(exePath) && File.Exists(exePath))
-                        localExeWriteUtc = File.GetLastWriteTimeUtc(exePath);
-                }
-                catch { }
-
-                bool isNewer = false;
-                if (releasePublished.HasValue)
-                {
-                    isNewer = releasePublished.Value.UtcDateTime > localExeWriteUtc;
-                }
-                else
-                {
-                    // fallback to tag comparison if published_at not available
-                    var currentVersion = GetCurrentVersionString();
-                    if (!string.IsNullOrWhiteSpace(latestTag) && !IsSameVersion(currentVersion, latestTag))
-                        isNewer = true;
-                }
-
-                if (!isNewer) return UpdateAction.None;
-
-                // compute a friendly installed version string for the prompt
-                var installedVersion = GetCurrentVersionString();
-                var message = $"A new release is available: {name} ({latestTag}).\nInstalled: {installedVersion}\n\nRelease notes:\n{(body ?? "(no notes)")}";
-
-                var res = MessageBox.Show(message + "\n\nDo you want to download and install the update now?", "Update available", MessageBoxButtons.YesNo, MessageBoxIcon.Information);
-                if (res != DialogResult.Yes) return UpdateAction.Skipped;
-
-                // find first zip asset
-                string? zipUrl = null;
-                if (root.TryGetProperty("assets", out var assets) && assets.ValueKind == System.Text.Json.JsonValueKind.Array)
-                {
-                    foreach (var a in assets.EnumerateArray())
+                    try
                     {
-                        if (a.TryGetProperty("browser_download_url", out var d) && a.TryGetProperty("name", out var n))
+                        using var http = new System.Net.Http.HttpClient();
+                        http.DefaultRequestHeaders.UserAgent.ParseAdd("AffirmationImageGenerator-Updater/1.0");
+                        var url = string.Format(GitHubApiLatest, owner, repo);
+                        var resp = await http.GetAsync(url).ConfigureAwait(false);
+                        if (!resp.IsSuccessStatusCode) return UpdateAction.None;
+
+                        var json = await resp.Content.ReadAsStringAsync().ConfigureAwait(false);
+                        using var doc = System.Text.Json.JsonDocument.Parse(json);
+                        var root = doc.RootElement;
+
+                        var latestTag = root.GetProperty("tag_name").GetString() ?? "";
+                        var name = root.GetProperty("name").GetString() ?? latestTag;
+                        var body = root.TryGetProperty("body", out var b) ? b.GetString() : null;
+
+                        // Prefer comparing release publish timestamp to the local exe write time. This is
+                        // more reliable when the assembly version isn't updated between releases.
+                        DateTimeOffset? releasePublished = null;
+                        if (root.TryGetProperty("published_at", out var pub) && pub.ValueKind == System.Text.Json.JsonValueKind.String)
                         {
-                            var nameAsset = n.GetString() ?? "";
-                            if (nameAsset.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
+                            var pubStr = pub.GetString();
+                            if (!string.IsNullOrWhiteSpace(pubStr) && DateTimeOffset.TryParse(pubStr, out var dto))
+                                releasePublished = dto.ToUniversalTime();
+                        }
+
+                        DateTime localExeWriteUtc = DateTime.MinValue;
+                        try
+                        {
+                            var exePath = System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName;
+                            if (!string.IsNullOrWhiteSpace(exePath) && File.Exists(exePath))
+                                localExeWriteUtc = File.GetLastWriteTimeUtc(exePath);
+                        }
+                        catch { }
+
+                        bool isNewer = false;
+                        if (releasePublished.HasValue)
+                        {
+                            isNewer = releasePublished.Value.UtcDateTime > localExeWriteUtc;
+                        }
+                        else
+                        {
+                            // fallback to tag comparison if published_at not available
+                            var currentVersion = GetCurrentVersionString();
+                            if (!string.IsNullOrWhiteSpace(latestTag) && !IsSameVersion(currentVersion, latestTag))
+                                isNewer = true;
+                        }
+
+                        if (!isNewer) return UpdateAction.None;
+
+                        // compute a friendly installed version string for the prompt
+                        var installedVersion = GetCurrentVersionString();
+                        var message = $"A new release is available: {name} ({latestTag}).\nInstalled: {installedVersion}\n\nRelease notes:\n{(body ?? "(no notes)")}";
+
+                        var res = MessageBox.Show(message + "\n\nDo you want to download and install the update now?", "Update available", MessageBoxButtons.YesNo, MessageBoxIcon.Information);
+                        if (res != DialogResult.Yes) return UpdateAction.Skipped;
+
+                        // find first zip asset
+                        string? zipUrl = null;
+                        if (root.TryGetProperty("assets", out var assets) && assets.ValueKind == System.Text.Json.JsonValueKind.Array)
+                        {
+                            foreach (var a in assets.EnumerateArray())
                             {
-                                zipUrl = d.GetString();
-                                break;
+                                if (a.TryGetProperty("browser_download_url", out var d) && a.TryGetProperty("name", out var n))
+                                {
+                                    var nameAsset = n.GetString() ?? "";
+                                    if (nameAsset.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
+                                    {
+                                        zipUrl = d.GetString();
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+
+                        if (zipUrl == null) MessageBox.Show("No .zip asset found for the latest release.");
+                        else
+                        {
+                            try
+                            {
+                                var currentDir = AppContext.BaseDirectory.TrimEnd(Path.DirectorySeparatorChar);
+                                var zipPath = Path.Combine(currentDir, "update_release.zip");
+                                var stream = await http.GetStreamAsync(zipUrl).ConfigureAwait(false);
+                                var fs = new FileStream(zipPath, FileMode.Create, FileAccess.Write, FileShare.None);
+                                await stream.CopyToAsync(fs).ConfigureAwait(false);
+                                fs.Close();
+                                stream.Dispose();
+
+                                // Extract zip directly into current app folder, overwrite files
+                                System.IO.Compression.ZipFile.ExtractToDirectory(zipPath, currentDir, true);
+                                try { File.Delete(zipPath); } catch { }
+
+                                // Relaunch the app
+                                var exePath = System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName;
+                                var psi = new System.Diagnostics.ProcessStartInfo
+                                {
+                                    FileName = exePath,
+                                    WorkingDirectory = currentDir,
+                                    UseShellExecute = true
+                                };
+                                System.Diagnostics.Process.Start(psi);
+
+                                Application.Exit();
+                                return UpdateAction.UpdatedAndRelaunched;
+                            }
+                            catch (Exception ex)
+                            {
+                                MessageBox.Show("Update failed: " + ex.Message);
+                                return UpdateAction.None;
                             }
                         }
                     }
-                }
-
-                if (zipUrl == null) MessageBox.Show("No .zip asset found for the latest release.");
-                else
-                {
-                    var tmp = Path.Combine(Path.GetTempPath(), "AffirmationUpdate");
-                    if (Directory.Exists(tmp)) Directory.Delete(tmp, true);
-                    Directory.CreateDirectory(tmp);
-
-                    var zipPath = Path.Combine(tmp, "release.zip");
-                    using (var stream = await http.GetStreamAsync(zipUrl).ConfigureAwait(false))
-                    using (var fs = new FileStream(zipPath, FileMode.Create, FileAccess.Write, FileShare.None))
+                    catch (Exception ex)
                     {
-                        await stream.CopyToAsync(fs).ConfigureAwait(false);
+                        MessageBox.Show("Update check failed: " + ex.Message);
                     }
-
-            else
-            {
-                try
-                {
-                    var currentDir = AppContext.BaseDirectory.TrimEnd(Path.DirectorySeparatorChar);
-                    var zipPath = Path.Combine(currentDir, "update_release.zip");
-                    using (var stream = await http.GetStreamAsync(zipUrl).ConfigureAwait(false))
-                    {
-                        using (var fs = new FileStream(zipPath, FileMode.Create, FileAccess.Write, FileShare.None))
-                        {
-                            await stream.CopyToAsync(fs).ConfigureAwait(false);
-                        }
-                    }
-
-                    // Extract zip directly into current app folder, overwrite files
-                    System.IO.Compression.ZipFile.ExtractToDirectory(zipPath, currentDir, true);
-                    try { File.Delete(zipPath); } catch { }
-
-                    // Relaunch the app
-                    var exePath = System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName;
-                    var psi = new System.Diagnostics.ProcessStartInfo
-                    {
-                        FileName = exePath,
-                        WorkingDirectory = currentDir,
-                        UseShellExecute = true
-                    };
-                    System.Diagnostics.Process.Start(psi);
-
-                    Application.Exit();
-                    return UpdateAction.UpdatedAndRelaunched;
-                }
-                catch (Exception ex)
-                {
-                    MessageBox.Show("Update failed: " + ex.Message);
-                    return UpdateAction.None;
-                }
-            }
-                    // launch powershell to apply update after this process exits
-                    var psi = new System.Diagnostics.ProcessStartInfo
-                    {
-                        FileName = "powershell.exe",
-                        Arguments = $"-NoProfile -ExecutionPolicy Bypass -File \"{psPath}\" ",
-                        UseShellExecute = false,
-                        CreateNoWindow = true
-                    };
-                    System.Diagnostics.Process.Start(psi);
-
-                    // exit this process so updater can replace files
-                    Application.Exit();
-                    return UpdateAction.UpdatedAndRelaunched;
-                }
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show("Update check failed: " + ex.Message);
-            }
             return UpdateAction.None;
         }
+    }
 
     public static string GetCurrentVersionString()
         {
@@ -250,134 +220,130 @@ namespace AffirmationImageGeneratorNice
             }
             catch { return null; }
         }
-    }
 
     public class WizardForm : Form
     {
-        private class Options
+    // Fields for WizardForm
+    private int stepIndex = 0;
+    private Panel[] steps = new Panel[4];
+    private Panel headerPanel = new Panel();
+    private Label titleLabel = new Label();
+    private FlowLayoutPanel stepPanel = new FlowLayoutPanel();
+    private MenuStrip mainMenu;
+    private ToolStripMenuItem versionMenuItem;
+    private ToolStripMenuItem checkUpdateMenuItem;
+    private TextBox basePathBox = new TextBox();
+    private Button btnChooseBase = new Button();
+    private ListBox baseImagesList = new ListBox();
+    private Label baseCountLabel = new Label();
+    private TextBox outputFolderBox = new TextBox();
+    private Button btnChooseOutput = new Button();
+    private TextBox fontPathBox = new TextBox();
+    private Button btnChooseFont = new Button();
+    private NumericUpDown fontSizeUp = new NumericUpDown();
+    private Button btnChooseColor = new Button();
+    private Panel colorPreview = new Panel();
+    private CheckBox chkRandomBase = new CheckBox();
+    private ListBox lstAffirmations = new ListBox();
+    private TextBox txtNewAffirmation = new TextBox();
+    private Button btnAddAff = new Button();
+    private Button btnRemoveAff = new Button();
+    private Button btnLoadList = new Button();
+    private Button btnSaveList = new Button();
+    private PictureBox previewBox = new PictureBox();
+    private Button btnPreview = new Button();
+    private Button btnGenerate = new Button();
+    // ...existing navigation, setup, font, color, settings fields already present...
+    private class Options
+    {
+        public string FontFile = "";
+        public float FontSize = 56f;
+        public Color Color = Color.White;
+        public int X = 30;
+        public int Y = 0;
+        public int Width = 0;
+        public int Height = 0;
+        public bool RandomBase = true;
+        public string Prefix = "affirmation_";
+    }
+    private Button btnBack = new Button();
+    private Button btnNext = new Button();
+
+    // setup mode controls
+    private Button btnHiddenSetup = new Button();   // tiny hidden button to enter setup
+    private Button btnSaveSetup = new Button();     // visible only while in setup mode
+
+    // fonts and styling
+    private PrivateFontCollection pfc = new PrivateFontCollection();
+    private Font? loadedFont = null;
+    private Color chosenColor = Color.White;
+
+    // settings
+    private readonly string settingsPath = Path.Combine(AppContext.BaseDirectory, "affirmation_settings.json");
+    private bool setupMode = false;
+
+    public WizardForm()
+    {
+        // Initialize menu controls
+        mainMenu = new MenuStrip();
+        versionMenuItem = new ToolStripMenuItem($"Version: {Updater.GetCurrentVersionString()}");
+        checkUpdateMenuItem = new ToolStripMenuItem("Check for Updates");
+        checkUpdateMenuItem.Click += async (s, e) => await CheckForUpdatesAsync();
+        var aboutMenuItem = new ToolStripMenuItem("About");
+        aboutMenuItem.Click += (s, e) => ShowAboutDialog();
+        mainMenu.Items.Add(versionMenuItem);
+        mainMenu.Items.Add(checkUpdateMenuItem);
+        mainMenu.Items.Add(aboutMenuItem);
+        Controls.Add(mainMenu);
+        MainMenuStrip = mainMenu;
+
+        this.Text = "Affirmation Image Maker";
+        this.Width = 1100;
+        this.Height = 760;
+        this.KeyPreview = true;
+        this.StartPosition = FormStartPosition.CenterScreen;
+        this.BackColor = Color.FromArgb(245, 247, 250);
+        this.Font = new Font("Segoe UI", 10);
+        this.FormBorderStyle = FormBorderStyle.FixedSingle;
+        this.MaximizeBox = false;
+
+        BuildHeader();
+        BuildSteps();
+        BuildNavigation();
+        WireKeys();
+
+        // load saved settings if present (auto-apply to controls, but do NOT change starting page)
+        LoadSettingsIfExists();
+
+        // populate base images list immediately (so preview works right away if a base/folder is already set)
+        PopulateBaseList();
+
+        // ensure we start on setup page so user sees Step 1 on load
+        stepIndex = 0;
+        UpdateStep();
+        this.FormClosing += WizardForm_FormClosing;
+    }
+
+    // Event handler for form closing
+    private void WizardForm_FormClosing(object sender, FormClosingEventArgs e)
+    {
+        if (setupMode)
         {
-            public string FontFile = "";
-            public float FontSize = 56f;
-            public Color Color = Color.White;
-            public int X = 30;
-                {
-                    var currentDir = AppContext.BaseDirectory.TrimEnd(Path.DirectorySeparatorChar);
-                    var zipPath = Path.Combine(currentDir, "update_release.zip");
-                    using (var stream = await http.GetStreamAsync(zipUrl).ConfigureAwait(false))
-                    using (var fs = new FileStream(zipPath, FileMode.Create, FileAccess.Write, FileShare.None))
-                    {
-                        await stream.CopyToAsync(fs).ConfigureAwait(false);
-                    }
-
-                    // Extract zip directly into current app folder, overwrite files
-                    System.IO.Compression.ZipFile.ExtractToDirectory(zipPath, currentDir, true);
-                    try { File.Delete(zipPath); } catch { }
-
-                    // Relaunch the app
-                    var exePath = System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName;
-                    var psi = new System.Diagnostics.ProcessStartInfo
-                    {
-                        FileName = exePath,
-                        WorkingDirectory = currentDir,
-                        UseShellExecute = true
-                    };
-                    System.Diagnostics.Process.Start(psi);
-
-                    Application.Exit();
-                    return UpdateAction.UpdatedAndRelaunched;
-        private Button btnBack = new Button();
-        private Button btnNext = new Button();
-
-        // setup mode controls
-        private Button btnHiddenSetup = new Button();   // tiny hidden button to enter setup
-        private Button btnSaveSetup = new Button();     // visible only while in setup mode
-
-        // fonts and styling
-        private PrivateFontCollection pfc = new PrivateFontCollection();
-        private Font? loadedFont = null;
-        private Color chosenColor = Color.White;
-
-        // settings
-        private readonly string settingsPath = Path.Combine(AppContext.BaseDirectory, "affirmation_settings.json");
-        private bool setupMode = false;
-
-        public WizardForm()
-        {
-            // Initialize menu controls
-            mainMenu = new MenuStrip();
-            versionMenuItem = new ToolStripMenuItem($"Version: {Updater.GetCurrentVersionString()}");
-            checkUpdateMenuItem = new ToolStripMenuItem("Check for Updates");
-            checkUpdateMenuItem.Click += async (s, e) => await CheckForUpdatesAsync();
-            var aboutMenuItem = new ToolStripMenuItem("About");
-            aboutMenuItem.Click += (s, e) => ShowAboutDialog();
-            mainMenu.Items.Add(versionMenuItem);
-            mainMenu.Items.Add(checkUpdateMenuItem);
-            mainMenu.Items.Add(aboutMenuItem);
-            Controls.Add(mainMenu);
-            MainMenuStrip = mainMenu;
-
-            this.Text = "Affirmation Image Maker";
-            this.Width = 1100;
-            this.Height = 760;
-            this.KeyPreview = true;
-            this.StartPosition = FormStartPosition.CenterScreen;
-            this.BackColor = Color.FromArgb(245, 247, 250);
-            this.Font = new Font("Segoe UI", 10);
-            this.FormBorderStyle = FormBorderStyle.FixedSingle;
-            this.MaximizeBox = false;
-
-            BuildHeader();
-            BuildSteps();
-            BuildNavigation();
-            WireKeys();
-
-            // load saved settings if present (auto-apply to controls, but do NOT change starting page)
-            LoadSettingsIfExists();
-
-            // populate base images list immediately (so preview works right away if a base/folder is already set)
-            PopulateBaseList();
-
-            // ensure we start on setup page so user sees Step 1 on load
-            stepIndex = 0;
-            UpdateStep();
-
-            this.FormClosing += WizardForm_FormClosing;
+            SaveSettings();
         }
+    }
         // ...existing code...
         private void ShowAboutDialog()
         {
             var version = Updater.GetCurrentVersionString();
             var credits = "Affirmation Generator\nBy coolguycoder\n\nGitHub: github.com/coolguycoder/Affirmation-Generator";
             MessageBox.Show($"Affirmation Generator\nVersion: {version}\n\n{credits}", "About", MessageBoxButtons.OK, MessageBoxIcon.Information);
-        }
+    }
 
-            Text = "Affirmation Image Maker";
-            Width = 1100;
-            Height = 760;
-            KeyPreview = true;
-            StartPosition = FormStartPosition.CenterScreen;
-            BackColor = Color.FromArgb(245, 247, 250);
-            Font = new Font("Segoe UI", 10);
-            FormBorderStyle = FormBorderStyle.FixedSingle;
-            MaximizeBox = false;
+            // ...existing code...
 
-            BuildHeader();
-            BuildSteps();
-            BuildNavigation();
-            WireKeys();
-
-            // load saved settings if present (auto-apply to controls, but do NOT change starting page)
-            LoadSettingsIfExists();
-
-            // populate base images list immediately (so preview works right away if a base/folder is already set)
-            PopulateBaseList();
-
-            // ensure we start on setup page so user sees Step 1 on load
-            stepIndex = 0;
-            UpdateStep();
-
-            this.FormClosing += WizardForm_FormClosing;
-        }
+            // Duplicate constructor code removed; all initialization is inside the WizardForm constructor above.
+    }
 
         // Fix for missing CheckForUpdatesAsync method
         private async System.Threading.Tasks.Task CheckForUpdatesAsync()
@@ -416,32 +382,31 @@ namespace AffirmationImageGeneratorNice
             stepPanel.SetBounds(650, 18, 420, 80);
             stepPanel.Padding = new Padding(8);
             stepPanel.AutoSize = false;
-            headerPanel.Controls.Add(stepPanel);
-
-            for (int i = 0; i < 4; i++)
-            {
-                var card = CreateStepCard(i + 1, i == 0 ? "Setup" : i == 1 ? "Affirmations" : i == 2 ? "Preview" : "About");
-                stepPanel.Controls.Add(card);
-            }
-
-            // tiny hidden setup button (top-right of header). small, flat, visually unobtrusive.
-            btnHiddenSetup.SetBounds(headerPanel.Width - 28, 12, 16, 16);
-            btnHiddenSetup.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-            btnHiddenSetup.FlatStyle = FlatStyle.Flat;
-            btnHiddenSetup.FlatAppearance.BorderSize = 0;
-            btnHiddenSetup.BackColor = Color.Transparent;
-            btnHiddenSetup.TabStop = false;
-            btnHiddenSetup.Click += (s, e) => EnterSetupMode();
-            headerPanel.Controls.Add(btnHiddenSetup);
-
-            // save-setup button (only visible while in setup mode)
-            btnSaveSetup.Text = "Save setup";
-            btnSaveSetup.SetBounds(headerPanel.Width - 140, 64, 120, 32);
-            btnSaveSetup.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-            btnSaveSetup.Click += (s, e) => SaveSetupAndExit();
-            btnSaveSetup.Visible = false;
-            headerPanel.Controls.Add(btnSaveSetup);
+        headerPanel.Controls.Add(stepPanel);
+        for (int i = 0; i < 4; i++)
+        {
+            var card = CreateStepCard(i + 1, i == 0 ? "Setup" : i == 1 ? "Affirmations" : i == 2 ? "Preview" : "About");
+            stepPanel.Controls.Add(card);
         }
+
+        // tiny hidden setup button (top-right of header). small, flat, visually unobtrusive.
+        btnHiddenSetup.SetBounds(headerPanel.Width - 28, 12, 16, 16);
+        btnHiddenSetup.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+        btnHiddenSetup.FlatStyle = FlatStyle.Flat;
+        btnHiddenSetup.FlatAppearance.BorderSize = 0;
+        btnHiddenSetup.BackColor = Color.Transparent;
+        btnHiddenSetup.TabStop = false;
+        btnHiddenSetup.Click += (s, e) => EnterSetupMode();
+        headerPanel.Controls.Add(btnHiddenSetup);
+
+        // save-setup button (only visible while in setup mode)
+        btnSaveSetup.Text = "Save setup";
+        btnSaveSetup.SetBounds(headerPanel.Width - 140, 64, 120, 32);
+        btnSaveSetup.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+        btnSaveSetup.Click += (s, e) => SaveSetupAndExit();
+        btnSaveSetup.Visible = false;
+        headerPanel.Controls.Add(btnSaveSetup);
+    }
 
         private Control CreateStepCard(int num, string text)
         {
@@ -545,6 +510,7 @@ namespace AffirmationImageGeneratorNice
             // auto-populate when basePathBox changes by leaving focus
             basePathBox.Leave += (s, e) => PopulateBaseList();
         }
+    }
 
         private void BuildStep2(Panel pane)
         {
@@ -589,7 +555,7 @@ namespace AffirmationImageGeneratorNice
                     if (res != null) lstAffirmations.Items[lstAffirmations.SelectedIndex] = res;
                 }
             };
-        }
+    }
 
         private void BuildStep3(Panel pane)
         {
@@ -613,7 +579,7 @@ namespace AffirmationImageGeneratorNice
             btnGenerate.Click += BtnGenerate_Click;
 
             card.Controls.AddRange(new Control[] { previewBox, btnPreview, btnGenerate });
-        }
+    }
 
         private void BuildStep4(Panel pane)
         {
@@ -646,7 +612,7 @@ namespace AffirmationImageGeneratorNice
                 }
             };
             card.Controls.Add(updateButton);
-        }
+    }
 
         private Panel MakeCard(int x, int y, int w, int h)
         {
@@ -667,7 +633,7 @@ namespace AffirmationImageGeneratorNice
                 e.Graphics.DrawRectangle(pen, 0, 0, p.Width - 1, p.Height - 1);
             };
             return p;
-        }
+    }
 
         private void BuildNavigation()
         {
@@ -680,7 +646,7 @@ namespace AffirmationImageGeneratorNice
             btnNext.Click += (s, e) => { if (stepIndex < steps.Length - 1) stepIndex++; UpdateStep(); };
 
             Controls.AddRange(new Control[] { btnBack, btnNext });
-        }
+    }
 
         private void UpdateStep()
         {
@@ -712,13 +678,13 @@ namespace AffirmationImageGeneratorNice
 
             // show/hide save-setup button
             btnSaveSetup.Visible = setupMode;
-        }
+    }
 
         // keys
         private void WireKeys()
         {
             this.KeyDown += WizardForm_KeyDown;
-        }
+    }
 
         private void WizardForm_KeyDown(object? sender, KeyEventArgs e)
         {
@@ -741,7 +707,7 @@ namespace AffirmationImageGeneratorNice
             {
                 SaveSettings();
             }
-        }
+    }
 
         private void EnterSetupMode()
         {
@@ -750,7 +716,7 @@ namespace AffirmationImageGeneratorNice
             stepIndex = 0;
             UpdateStep();
             MessageBox.Show("Setup mode: change Output / Font / Colour then click 'Save setup' (top-right). Base image is NOT saved.");
-        }
+    }
 
         private void SaveSettings()
         {
@@ -1145,3 +1111,7 @@ namespace AffirmationImageGeneratorNice
             }
             return bmp;
         }
+
+    // end of WizardForm class
+    }
+    }
