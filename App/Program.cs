@@ -193,7 +193,7 @@ Start-Process -FilePath ""{Path.Combine(parentDir, Path.GetFileName(exe))}""
             return UpdateAction.None;
         }
 
-        private static string GetCurrentVersionString()
+    public static string GetCurrentVersionString()
         {
             try
             {
