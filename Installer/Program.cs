@@ -161,7 +161,15 @@ namespace SimpleInstaller
         GroupBox groupBox;
 
         // Download URL (raw GitHub file you provided)
-        const string DownloadUrl = "https://github.com/coolguycoder/Affirmation-Generator/releases/latest/download/app-x64.zip";
+        private string GetDownloadUrl()
+        {
+            var arch = System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture;
+            if (arch == System.Runtime.InteropServices.Architecture.Arm64)
+            {
+                return "https://github.com/coolguycoder/Affirmation-Generator/releases/latest/download/app-arm64.zip";
+            }
+            return "https://github.com/coolguycoder/Affirmation-Generator/releases/latest/download/app-x64.zip";
+        }
 
         // Quick scan config
         const int SystemScanTimeoutMs = 8000; // time budget to find existing installation (ms)
@@ -334,11 +342,11 @@ namespace SimpleInstaller
                 string tempFolder = Path.Combine(Path.GetTempPath(), "SimpleInstaller");
                 Directory.CreateDirectory(tempFolder);
 
-                string zipPath = Path.Combine(tempFolder, "app-x64.zip");
+                string zipPath = Path.Combine(tempFolder, Path.GetFileName(new Uri(GetDownloadUrl()).LocalPath));
 
                 UpdateActionSafe("Downloading package...");
                 UpdateStatusSafe("Starting download");
-                await DownloadValidatedZipAsync(DownloadUrl, zipPath, new Progress<ProgressInfo>(info =>
+                await DownloadValidatedZipAsync(GetDownloadUrl(), zipPath, new Progress<ProgressInfo>(info =>
                 {
                     if (info != null)
                     {
