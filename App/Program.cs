@@ -301,8 +301,9 @@ namespace AffirmationImageGeneratorNice
         mainMenu.Items.Add(versionMenuItem);
         mainMenu.Items.Add(checkUpdateMenuItem);
         mainMenu.Items.Add(aboutMenuItem);
-        Controls.Add(mainMenu);
-        MainMenuStrip = mainMenu;
+    Controls.Add(mainMenu);
+    MainMenuStrip = mainMenu;
+    mainMenu.KeyDown += MainMenu_KeyDown;
 
         this.Text = "Affirmation Image Maker";
         this.Width = 1100;
@@ -685,6 +686,15 @@ namespace AffirmationImageGeneratorNice
     }
 
         // keys
+        // Handles Ctrl+A in mainMenu
+        private void MainMenu_KeyDown(object? sender, KeyEventArgs e)
+        {
+            if (e.Control && e.KeyCode == Keys.A)
+            {
+                ShowAboutDialog();
+                e.Handled = true;
+            }
+        }
         private void WireKeys()
         {
             this.KeyDown += WizardForm_KeyDown;

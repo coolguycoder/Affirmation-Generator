@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "C:\\Users\\Marcus\\Documents\\Coding\\Affirmation-Generator\\App\\AffirmationImageGenerator.csproj": {}
+    "C:\\Users\\Marcus\\Documents\\Coding\\Affirmation-Generator\\app\\AffirmationImageGenerator.csproj": {}
   },
   "projects": {
-    "C:\\Users\\Marcus\\Documents\\Coding\\Affirmation-Generator\\App\\AffirmationImageGenerator.csproj": {
+    "C:\\Users\\Marcus\\Documents\\Coding\\Affirmation-Generator\\app\\AffirmationImageGenerator.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "C:\\Users\\Marcus\\Documents\\Coding\\Affirmation-Generator\\App\\AffirmationImageGenerator.csproj",
+        "projectUniqueName": "C:\\Users\\Marcus\\Documents\\Coding\\Affirmation-Generator\\app\\AffirmationImageGenerator.csproj",
         "projectName": "AffirmationImageGenerator",
-        "projectPath": "C:\\Users\\Marcus\\Documents\\Coding\\Affirmation-Generator\\App\\AffirmationImageGenerator.csproj",
+        "projectPath": "C:\\Users\\Marcus\\Documents\\Coding\\Affirmation-Generator\\app\\AffirmationImageGenerator.csproj",
         "packagesPath": "C:\\Users\\Marcus\\.nuget\\packages\\",
-        "outputPath": "C:\\Users\\Marcus\\Documents\\Coding\\Affirmation-Generator\\App\\obj\\",
+        "outputPath": "C:\\Users\\Marcus\\Documents\\Coding\\Affirmation-Generator\\app\\obj\\",
         "projectStyle": "PackageReference",
         "configFilePaths": [
           "C:\\Users\\Marcus\\AppData\\Roaming\\NuGet\\NuGet.Config"
