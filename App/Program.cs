@@ -303,7 +303,6 @@ namespace AffirmationImageGeneratorNice
         mainMenu.Items.Add(aboutMenuItem);
     Controls.Add(mainMenu);
     MainMenuStrip = mainMenu;
-    mainMenu.KeyDown += MainMenu_KeyDown;
 
         this.Text = "Affirmation Image Maker";
         this.Width = 1100;
@@ -349,9 +348,82 @@ namespace AffirmationImageGeneratorNice
         private void ShowAboutDialog()
         {
             var version = Updater.GetCurrentVersionString();
-            var credits = "Affirmation Generator\nBy coolguycoder\n\nGitHub: github.com/coolguycoder/Affirmation-Generator";
-            MessageBox.Show($"Affirmation Generator\nVersion: {version}\n\n{credits}", "About", MessageBoxButtons.OK, MessageBoxIcon.Information);
-    }
+            var credits = "Affirmation Generator\nBy coolguycoder\nGitHub: github.com/coolguycoder/Affirmation-Generator";
+
+            var aboutForm = new Form()
+            {
+                Text = "About Affirmation Generator",
+                Width = 420,
+                Height = 260,
+                FormBorderStyle = FormBorderStyle.FixedDialog,
+                StartPosition = FormStartPosition.CenterParent,
+                MaximizeBox = false,
+                MinimizeBox = false
+            };
+
+            var lblTitle = new Label()
+            {
+                Text = "Affirmation Generator",
+                Font = new Font("Segoe UI Semibold", 16f),
+                AutoSize = true,
+                Location = new Point(24, 18)
+            };
+            aboutForm.Controls.Add(lblTitle);
+
+            var lblVersion = new Label()
+            {
+                Text = $"Version: {version}",
+                Font = new Font("Segoe UI", 11f),
+                AutoSize = true,
+                Location = new Point(24, 54)
+            };
+            aboutForm.Controls.Add(lblVersion);
+
+            var lblCredits = new Label()
+            {
+                Text = "By coolguycoder\nGitHub: github.com/coolguycoder/Affirmation-Generator",
+                Font = new Font("Segoe UI", 10f),
+                AutoSize = true,
+                Location = new Point(24, 84)
+            };
+            aboutForm.Controls.Add(lblCredits);
+
+            var btnUpdate = new Button()
+            {
+                Text = "Check for Updates",
+                Width = 140,
+                Height = 36,
+                Location = new Point(24, 130)
+            };
+            btnUpdate.Click += async (s, e) =>
+            {
+                btnUpdate.Enabled = false;
+                btnUpdate.Text = "Checking...";
+                var updater = new Updater("coolguycoder", "Affirmation-Generator");
+                var updateResult = await updater.CheckAndPromptForUpdateAsync();
+                if (updateResult == Updater.UpdateAction.None)
+                {
+                    MessageBox.Show("No updates available.", "Update Check", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
+                btnUpdate.Enabled = true;
+                btnUpdate.Text = "Check for Updates";
+            };
+            aboutForm.Controls.Add(btnUpdate);
+
+            var btnOK = new Button()
+            {
+                Text = "OK",
+                Width = 80,
+                Height = 32,
+                Location = new Point(aboutForm.ClientSize.Width - 104, aboutForm.ClientSize.Height - 56),
+                Anchor = AnchorStyles.Bottom | AnchorStyles.Right,
+                DialogResult = DialogResult.OK
+            };
+            aboutForm.Controls.Add(btnOK);
+            aboutForm.AcceptButton = btnOK;
+
+            aboutForm.ShowDialog(this);
+        }
 
             // ...existing code...
 
@@ -702,9 +774,11 @@ namespace AffirmationImageGeneratorNice
                 steps[i].Visible = (i == stepIndex);
                 if (steps[i].Visible) steps[i].BringToFront();
             }
-            // Always bring mainMenu and headerPanel to front
+            // Always bring mainMenu, headerPanel, and navigation buttons to front
             if (mainMenu != null) mainMenu.BringToFront();
             if (headerPanel != null) headerPanel.BringToFront();
+            btnBack.BringToFront();
+            btnNext.BringToFront();
 
             foreach (Control c in stepPanel.Controls)
             {
