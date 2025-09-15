@@ -322,10 +322,48 @@ Start-Process -FilePath ""{Path.Combine(parentDir, Path.GetFileName(exe))}""
             versionMenuItem = new ToolStripMenuItem($"Version: {Updater.GetCurrentVersionString()}");
             checkUpdateMenuItem = new ToolStripMenuItem("Check for Updates");
             checkUpdateMenuItem.Click += async (s, e) => await CheckForUpdatesAsync();
+            var aboutMenuItem = new ToolStripMenuItem("About");
+            aboutMenuItem.Click += (s, e) => ShowAboutDialog();
             mainMenu.Items.Add(versionMenuItem);
             mainMenu.Items.Add(checkUpdateMenuItem);
+            mainMenu.Items.Add(aboutMenuItem);
             Controls.Add(mainMenu);
             MainMenuStrip = mainMenu;
+
+            Text = "Affirmation Image Maker";
+            Width = 1100;
+            Height = 760;
+            KeyPreview = true;
+            StartPosition = FormStartPosition.CenterScreen;
+            BackColor = Color.FromArgb(245, 247, 250);
+            Font = new Font("Segoe UI", 10);
+            FormBorderStyle = FormBorderStyle.FixedSingle;
+            MaximizeBox = false;
+
+            BuildHeader();
+            BuildSteps();
+            BuildNavigation();
+            WireKeys();
+
+            // load saved settings if present (auto-apply to controls, but do NOT change starting page)
+            LoadSettingsIfExists();
+
+            // populate base images list immediately (so preview works right away if a base/folder is already set)
+            PopulateBaseList();
+
+            // ensure we start on setup page so user sees Step 1 on load
+            stepIndex = 0;
+            UpdateStep();
+
+            this.FormClosing += WizardForm_FormClosing;
+        }
+        // ...existing code...
+        private void ShowAboutDialog()
+        {
+            var version = Updater.GetCurrentVersionString();
+            var credits = "Affirmation Generator\nBy coolguycoder\n\nGitHub: github.com/coolguycoder/Affirmation-Generator";
+            MessageBox.Show($"Affirmation Generator\nVersion: {version}\n\n{credits}", "About", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
 
             Text = "Affirmation Image Maker";
             Width = 1100;
@@ -1152,37 +1190,3 @@ Start-Process -FilePath ""{Path.Combine(parentDir, Path.GetFileName(exe))}""
             }
             return bmp;
         }
-
-        private class ProgressForm : Form
-        {
-            private ProgressBar pb;
-            public ProgressForm(int max)
-            {
-                Text = "Generating";
-                Width = 420; Height = 120; StartPosition = FormStartPosition.CenterParent;
-                pb = new ProgressBar { Minimum = 0, Maximum = max, Dock = DockStyle.Fill };
-                Controls.Add(pb);
-            }
-            public void Increment() => Invoke((Action)(() => { if (pb.Value < pb.Maximum) pb.Value += 1; }));
-        }
-
-        public static class Prompt
-        {
-            public static string? ShowDialog(string text, string caption, string value = "")
-            {
-                Form prompt = new Form()
-                {
-                    Width = 600, Height = 180, Text = caption, StartPosition = FormStartPosition.CenterParent
-                };
-                Label textLabel = new Label() { Left = 20, Top = 20, Text = text, Width = 540 };
-                TextBox txt = new TextBox() { Left = 20, Top = 50, Width = 540 };
-                txt.Text = value;
-                Button ok = new Button() { Text = "OK", Left = 360, Width = 90, Top = 85, DialogResult = DialogResult.OK };
-                Button cancel = new Button() { Text = "Cancel", Left = 460, Width = 90, Top = 85, DialogResult = DialogResult.Cancel };
-                prompt.AcceptButton = ok; prompt.CancelButton = cancel;
-                prompt.Controls.AddRange(new Control[] { textLabel, txt, ok, cancel });
-                return prompt.ShowDialog() == DialogResult.OK ? txt.Text : null;
-            }
-        }
-    }
-}
