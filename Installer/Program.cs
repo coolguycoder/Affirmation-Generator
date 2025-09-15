@@ -39,7 +39,7 @@ namespace InstallerRunner
 
         static async Task RunAsync()
         {
-            byte[] assemblyBytes = await DownloadAssembly(DllUrl);
+            byte[]? assemblyBytes = await DownloadAssembly(DllUrl);
             if (assemblyBytes != null)
             {
                 // The assembly must be loaded and run on a Single-Threaded Apartment (STA) thread for WinForms.
