@@ -957,7 +957,7 @@ Start-Process -FilePath ""{Path.Combine(parentDir, Path.GetFileName(exe))}""
 
             string baseFile;
             if (baseImagesList.SelectedIndex >= 0)
-                baseFile = baseImagesList.SelectedItem.ToString() ?? baseList[0];
+                baseFile = baseImagesList.SelectedItem?.ToString() ?? baseList[0];
             else
                 baseFile = baseList[0];
 
@@ -1014,7 +1014,7 @@ Start-Process -FilePath ""{Path.Combine(parentDir, Path.GetFileName(exe))}""
                 // if user selected specific base in list, use that for all; otherwise random or first
                 string baseFile;
                 if (baseImagesList.SelectedIndex >= 0)
-                    baseFile = baseImagesList.SelectedItem.ToString() ?? baseList[0];
+                    baseFile = baseImagesList.SelectedItem?.ToString() ?? baseList[0];
                 else if (baseList.Count == 1 || !opts.RandomBase)
                     baseFile = baseList[0];
                 else

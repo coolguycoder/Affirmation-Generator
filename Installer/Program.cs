@@ -52,7 +52,7 @@ namespace InstallerRunner
             }
         }
 
-        private static async Task<byte[]> DownloadAssembly(string url)
+    private static async Task<byte[]?> DownloadAssembly(string url)
         {
             try
             {
