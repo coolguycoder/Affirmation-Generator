@@ -78,41 +78,98 @@ func main() {
 				declarative.Label{Text: "Size:"},
 				declarative.NumberEdit{AssignTo: &nbSize, Value: 48},
 			}},
-				declarative.Composite{Layout: declarative.HBox{}, Children: []declarative.Widget{
+			declarative.Composite{Layout: declarative.HBox{}, Children: []declarative.Widget{
 				declarative.PushButton{Text: "Populate Bases", OnClicked: func() {
 					basesSlice = resolveBaseImages(leBase.Text())
 					if lbBases != nil {
 						lbBases.SetModel(NewStringListModel(basesSlice))
 					}
 				}},
+				declarative.Composite{Layout: declarative.HBox{}, Children: []declarative.Widget{
+					declarative.Label{Text: "Text color:"},
+					declarative.PushButton{Text: "Choose Color", OnClicked: func() {
+						var d *walk.Dialog
+						var nr, ng, nb *walk.NumberEdit
+						// set defaults from current
+						cur := appSettings.TextColor
+						_ = declarative.Dialog{
+							AssignTo: &d,
+							Title:    "Choose Color",
+							MinSize:  declarative.Size{Width: 320, Height: 140},
+							Layout:   declarative.VBox{},
+							Children: []declarative.Widget{
+								declarative.Composite{Layout: declarative.HBox{}, Children: []declarative.Widget{declarative.Label{Text: "R:"}, declarative.NumberEdit{AssignTo: &nr, Value: float64(cur.R)}, declarative.Label{Text: "G:"}, declarative.NumberEdit{AssignTo: &ng, Value: float64(cur.G)}, declarative.Label{Text: "B:"}, declarative.NumberEdit{AssignTo: &nb, Value: float64(cur.B)}}},
+								declarative.Composite{Layout: declarative.HBox{}, Children: []declarative.Widget{declarative.HSpacer{}, declarative.PushButton{Text: "OK", OnClicked: func() { d.Accept() }}, declarative.PushButton{Text: "Cancel", OnClicked: func() { d.Cancel() }}}},
+							},
+						}.Create(mw)
+						if d.Run() == walk.DlgCmdOK {
+							r := uint8(nr.Value())
+							g := uint8(ng.Value())
+							b := uint8(nb.Value())
+							appSettings.TextColor = color.RGBA{R: r, G: g, B: b, A: 255}
+							_ = saveSettings("affirmation_settings.json", appSettings)
+						}
+					}},
+				}},
 				declarative.PushButton{Text: "Preview Selected", OnClicked: func() {
 					// read selection from listbox
 					idx := -1
-					if lbAff != nil { idx = lbAff.CurrentIndex() }
-					if idx < 0 { walk.MsgBox(mw, "No selection", "No affirmation selected", walk.MsgBoxIconWarning); return }
+					if lbAff != nil {
+						idx = lbAff.CurrentIndex()
+					}
+					if idx < 0 {
+						walk.MsgBox(mw, "No selection", "No affirmation selected", walk.MsgBoxIconWarning)
+						return
+					}
 					text := affSlice[idx]
 					// choose base
 					bidx := -1
-					if lbBases != nil { bidx = lbBases.CurrentIndex() }
+					if lbBases != nil {
+						bidx = lbBases.CurrentIndex()
+					}
 					if bidx < 0 {
-						if len(basesSlice) == 0 { basesSlice = resolveBaseImages(leBase.Text()) }
-						if len(basesSlice) == 0 { walk.MsgBox(mw, "No base", "No base images", walk.MsgBoxIconWarning); return }
+						if len(basesSlice) == 0 {
+							basesSlice = resolveBaseImages(leBase.Text())
+						}
+						if len(basesSlice) == 0 {
+							walk.MsgBox(mw, "No base", "No base images", walk.MsgBoxIconWarning)
+							return
+						}
 						bidx = 0
 					}
 					base := basesSlice[bidx]
 					img, err := loadImage(base)
-					if err != nil { walk.MsgBox(mw, "Error", fmt.Sprintf("load base: %v", err), walk.MsgBoxIconError); return }
+					if err != nil {
+						walk.MsgBox(mw, "Error", fmt.Sprintf("load base: %v", err), walk.MsgBoxIconError)
+						return
+					}
 					out, err := renderAffirmation(img, text, RenderOptions{FontPath: leFont.Text(), FontSize: float64(nbSize.Value()), TextColor: appSettings.TextColor, OutlineColor: color.Black, X: 20, Y: 20})
-					if err != nil { walk.MsgBox(mw, "Error", fmt.Sprintf("render: %v", err), walk.MsgBoxIconError); return }
+					if err != nil {
+						walk.MsgBox(mw, "Error", fmt.Sprintf("render: %v", err), walk.MsgBoxIconError)
+						return
+					}
 					bmp, err := walk.NewBitmapFromImage(out)
-					if err == nil && imgView != nil { imgView.SetImage(bmp) }
+					if err == nil && imgView != nil {
+						imgView.SetImage(bmp)
+					}
 				}},
 				declarative.PushButton{Text: "Generate", OnClicked: func() {
 					outDir := leOut.Text()
-					if err := os.MkdirAll(outDir, 0o755); err != nil { walk.MsgBox(mw, "Error", fmt.Sprintf("out: %v", err), walk.MsgBoxIconError); return }
-					if len(affSlice) == 0 { walk.MsgBox(mw, "No affirmations", "Add at least one affirmation", walk.MsgBoxIconWarning); return }
-					if len(basesSlice) == 0 { basesSlice = resolveBaseImages(leBase.Text()) }
-					if len(basesSlice) == 0 { walk.MsgBox(mw, "No base", "No base images", walk.MsgBoxIconWarning); return }
+					if err := os.MkdirAll(outDir, 0o755); err != nil {
+						walk.MsgBox(mw, "Error", fmt.Sprintf("out: %v", err), walk.MsgBoxIconError)
+						return
+					}
+					if len(affSlice) == 0 {
+						walk.MsgBox(mw, "No affirmations", "Add at least one affirmation", walk.MsgBoxIconWarning)
+						return
+					}
+					if len(basesSlice) == 0 {
+						basesSlice = resolveBaseImages(leBase.Text())
+					}
+					if len(basesSlice) == 0 {
+						walk.MsgBox(mw, "No base", "No base images", walk.MsgBoxIconWarning)
+						return
+					}
 					for i, a := range affSlice {
 						b := basesSlice[rand.Intn(len(basesSlice))]
 						if err := generateToFile(b, a, leFont.Text(), float64(nbSize.Value()), color.RGBA{255, 255, 255, 255}, outDir, fmt.Sprintf("affirmation_%d.png", i)); err != nil {
@@ -121,33 +178,42 @@ func main() {
 					}
 				}},
 			}},
-				declarative.Composite{Layout: declarative.VBox{}, Children: []declarative.Widget{
-					declarative.Composite{Layout: declarative.HBox{}, Children: []declarative.Widget{
-						declarative.LineEdit{AssignTo: &leNewAff, MinSize: declarative.Size{Width: 220}, OnKeyDown: func(key walk.Key) { if key == walk.KeyReturn { /* handled in button */ } }},
-						declarative.PushButton{Text: "Add", OnClicked: func() {
-							txt := strings.TrimSpace(leNewAff.Text())
-							if txt == "" { return }
-							affSlice = append(affSlice, txt)
+			declarative.Composite{Layout: declarative.VBox{}, Children: []declarative.Widget{
+				declarative.Composite{Layout: declarative.HBox{}, Children: []declarative.Widget{
+					declarative.LineEdit{AssignTo: &leNewAff, MinSize: declarative.Size{Width: 220}, OnKeyDown: func(key walk.Key) {
+						if key == walk.KeyReturn { /* handled in button */
+						}
+					}},
+					declarative.PushButton{Text: "Add", OnClicked: func() {
+						txt := strings.TrimSpace(leNewAff.Text())
+						if txt == "" {
+							return
+						}
+						affSlice = append(affSlice, txt)
+						if lbAff != nil {
+							lbAff.SetModel(NewStringListModel(affSlice))
+						}
+						leNewAff.SetText("")
+					}},
+					declarative.PushButton{Text: "Remove Selected", OnClicked: func() {
+						idx := -1
+						if lbAff != nil {
+							idx = lbAff.CurrentIndex()
+						}
+						if idx >= 0 && idx < len(affSlice) {
+							affSlice = append(affSlice[:idx], affSlice[idx+1:]...)
 							if lbAff != nil {
 								lbAff.SetModel(NewStringListModel(affSlice))
 							}
-							leNewAff.SetText("")
-						}},
-						declarative.PushButton{Text: "Remove Selected", OnClicked: func() {
-							idx := -1
-							if lbAff != nil { idx = lbAff.CurrentIndex() }
-							if idx >= 0 && idx < len(affSlice) {
-								affSlice = append(affSlice[:idx], affSlice[idx+1:]...)
-								if lbAff != nil { lbAff.SetModel(NewStringListModel(affSlice)) }
-							}
-						}},
-					}},
-					declarative.Composite{Layout: declarative.HBox{}, Children: []declarative.Widget{
-						declarative.ListBox{AssignTo: &lbBases, MinSize: declarative.Size{Width: 300, Height: 140}},
-						declarative.ListBox{AssignTo: &lbAff, MinSize: declarative.Size{Width: 300, Height: 140}},
-						declarative.ImageView{AssignTo: &imgView, MinSize: declarative.Size{Width: 260, Height: 180}},
+						}
 					}},
 				}},
+				declarative.Composite{Layout: declarative.HBox{}, Children: []declarative.Widget{
+					declarative.ListBox{AssignTo: &lbBases, MinSize: declarative.Size{Width: 300, Height: 140}},
+					declarative.ListBox{AssignTo: &lbAff, MinSize: declarative.Size{Width: 300, Height: 140}},
+					declarative.ImageView{AssignTo: &imgView, MinSize: declarative.Size{Width: 260, Height: 180}},
+				}},
+			}},
 		},
 	}.Run()); err != nil {
 		log.Fatal(err)

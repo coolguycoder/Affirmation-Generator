@@ -11,7 +11,7 @@ type Settings struct {
 	OutputFolder     string      `json:"outputFolder"`
 	FontPath         string      `json:"fontPath"`
 	FontSize         float64     `json:"fontSize"`
-	TextColor        color.Color `json:"textColor"`
+	TextColor        color.RGBA `json:"textColor"`
 	RandomBase       bool        `json:"randomBase"`
 	ProcessAllImages bool        `json:"processAllImages"`
 	Affirmations     []string    `json:"affirmations"`
@@ -20,8 +20,8 @@ type Settings struct {
 func loadSettings(path string) (*Settings, error) {
 	data, err := ioutil.ReadFile(path)
 	if err != nil {
-		if os.IsNotExist(err) {
-			return &Settings{TextColor: color.White}, nil // Return default settings with white color
+	    if os.IsNotExist(err) {
+		    return &Settings{TextColor: color.RGBA{R:255, G:255, B:255, A:255}}, nil // default white
 		}
 		return nil, err
 	}
