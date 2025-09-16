@@ -5,17 +5,16 @@ import (
 	"image/color"
 	"io/ioutil"
 	"os"
-	"path/filepath"
 )
 
 type Settings struct {
-	OutputFolder    string      `json:"outputFolder"`
-	FontPath        string      `json:"fontPath"`
-	FontSize        float64     `json:"fontSize"`
-	TextColor       color.Color `json:"textColor"`
-	RandomBase      bool        `json:"randomBase"`
+	OutputFolder     string      `json:"outputFolder"`
+	FontPath         string      `json:"fontPath"`
+	FontSize         float64     `json:"fontSize"`
+	TextColor        color.Color `json:"textColor"`
+	RandomBase       bool        `json:"randomBase"`
 	ProcessAllImages bool        `json:"processAllImages"`
-	Affirmations    []string    `json:"affirmations"`
+	Affirmations     []string    `json:"affirmations"`
 }
 
 func loadSettings(path string) (*Settings, error) {

@@ -1,4 +1,3 @@
-
 package main
 
 import (
@@ -8,7 +7,6 @@ import (
 	"image/draw"
 	"image/jpeg"
 	"image/png"
-	"io"
 	"math/rand"
 	"os"
 	"path/filepath"
@@ -28,14 +26,14 @@ var fontData []byte
 
 // Options for rendering text on an image
 type RenderOptions struct {
-	FontPath   string
-	FontSize   float64
-	TextColor  color.Color
+	FontPath     string
+	FontSize     float64
+	TextColor    color.Color
 	OutlineColor color.Color
-	X          int
-	Y          int
-	Width      int
-	Height     int
+	X            int
+	Y            int
+	Width        int
+	Height       int
 }
 
 // loadImage loads an image from the specified file path.
@@ -128,6 +126,7 @@ func renderAffirmation(src image.Image, text string, opts RenderOptions) (image.
 	c.SetFont(parsedFont)
 	c.SetFontSize(opts.FontSize)
 	c.SetClip(dst.Bounds())
+	// Set destination to the actual image so text is drawn onto dst
 	c.SetDst(dst)
 
 	// Calculate text position for centering and wrapping
@@ -137,12 +136,12 @@ func renderAffirmation(src image.Image, text string, opts RenderOptions) (image.
 	// Use a bounding box for text rendering
 	textRect := image.Rect(opts.X, opts.Y, imgWidth-opts.X, imgHeight-opts.Y)
 
-	// Create a drawer for measuring text
+	// Create a drawer for measuring text. Use the actual destination image as Dst
 	drawer := &font.Drawer{
-		Face:    truetype.NewFace(parsedFont, &truetype.Options{Size: opts.FontSize, DPI: 72}),
-		Src:     image.Transparent,
-		Dst:     image.Transparent,
-		Dot:     fixed.Point{},
+		Face: truetype.NewFace(parsedFont, &truetype.Options{Size: opts.FontSize, DPI: 72}),
+		Src:  image.NewUniform(color.Transparent),
+		Dst:  dst,
+		Dot:  fixed.Point26_6{},
 	}
 
 	// Split text into lines for wrapping
