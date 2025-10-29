@@ -5,7 +5,9 @@ package main
 
 import (
 	"fmt"
+	"image"
 	"image/color"
+	"image/draw"
 	"log"
 	"math/rand"
 	"os"
@@ -39,6 +41,20 @@ func main() {
 	var lbBases *walk.ListBox
 	var lbAff *walk.ListBox
 	var leNewAff *walk.LineEdit
+	var colorPreview *walk.ImageView
+
+	updatePreview := func() {
+		if colorPreview == nil {
+			return
+		}
+		// create a small bitmap of the selected color
+		c := appSettings.TextColor
+		img := image.NewRGBA(image.Rect(0, 0, 40, 28))
+		draw.Draw(img, img.Bounds(), &image.Uniform{C: c}, image.Point{}, draw.Src)
+		if bmp, err := walk.NewBitmapFromImage(img); err == nil {
+			colorPreview.SetImage(bmp)
+		}
+	}
 	var imgView *walk.ImageView
 	// local slices to hold list content
 	var basesSlice []string
@@ -84,6 +100,7 @@ func main() {
 					if lbBases != nil {
 						lbBases.SetModel(NewStringListModel(basesSlice))
 					}
+					updatePreview()
 				}},
 				declarative.Composite{Layout: declarative.HBox{}, Children: []declarative.Widget{
 					declarative.Label{Text: "Text color:"},
@@ -108,6 +125,7 @@ func main() {
 							b := uint8(nb.Value())
 							appSettings.TextColor = color.RGBA{R: r, G: g, B: b, A: 255}
 							_ = saveSettings("affirmation_settings.json", appSettings)
+							updatePreview()
 						}
 					}},
 				}},
